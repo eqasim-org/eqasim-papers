@@ -20,7 +20,7 @@ simulations_output_path = os.path.join(base_output_path, "simulations")
 
 baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_trips.csv")
 
-baseline_simulation_memory = config["baseline_sim_meme"]
+baseline_simulation_memory = config["baseline_sim_mem"]
 service_simulation_memory = config["service_sim_mem"]
 
 rule all:
