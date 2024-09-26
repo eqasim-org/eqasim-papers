@@ -2,27 +2,43 @@ import os
 
 mvn_project_base_path = "../../../../"
 
-java_path = "'C:/Users/tarek.chouaki/.jdks/corretto-21.0.4/bin/java"
 pom_path = "../../../../pom.xml"
-mvn_path = "C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2023.1.4/plugins/maven/lib/maven3/bin/mvn"
 mvn_repository_path = ".m2/repository"
 
-jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "original-dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
+jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
 
-simulation_inputs_path = "C:/Users/tarek.chouaki/simulations/idf/25pct/idf_25pct_egt_240918/matsim_inputs"
+temp_path = config["temp_path"]
+original_simulation_files = config["simulation_inputs_path"]
+threads_per_sim = config["threads_per_sim"]
 
+simulation_inputs_path = os.path.join(temp_path, "simulation_inputs")
 input_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config.xml")
 baseline_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config_baseline.xml")
 
+base_output_path = config["output_path"]
+simulations_output_path = os.path.join(base_output_path, "simulations")
+
+baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_trips.csv")
+
 rule all:
     input:
-        baseline_config_path
+        baseline_trips_path
+
+rule copy_sim_files:
+    input:
+        os.path.join(original_simulation_files, "ile_de_france_config.xml")
+    output:
+        os.path.join(simulation_inputs_path, "ile_de_france_config.xml")
+    shell:
+        """
+        cp {original_simulation_files}/* {simulation_inputs_path}
+        """
 
 rule compile:
     output:
         jar_path
     shell:
-        '"{mvn_path}" package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+        'mvn package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
 rule baseline_config:
     input:
@@ -31,4 +47,17 @@ rule baseline_config:
     output:
         baseline_config_path
     shell:
-        '"{java_path}" -cp "{jar_path}" org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon --input-config-path="{input_config_path}" --output-config-path="{baseline_config_path}"'
+        """
+        java -cp "{jar_path}" org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon --input-config-path="{input_config_path}" --output-config-path="{baseline_config_path}"
+        java -cp "{jar_path}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF --input-config-path="{baseline_config_path}" --output-config-path="{baseline_config_path}" --engine=true --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 --config:global.numberOfThreads={threads_per_sim}
+        """
+
+rule baseline_simulation:
+    input:
+        baseline_config_path
+    output:
+        baseline_trips_path
+    shell:
+        """
+        java -cp "{jar_path}" org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
+        """

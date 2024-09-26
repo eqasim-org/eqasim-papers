@@ -1,2 +1,4 @@
 .idea
 .snakemake
+.matsim_inputs
+temp
