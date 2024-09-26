@@ -2,3 +2,5 @@ simulation_inputs_path: "matsim_inputs"
 temp_path: "temp"
 output_path: "./outputs"
 threads_per_sim: 12
+baseline_sim_mem: "50G"
+service_sim_mem: "20G"

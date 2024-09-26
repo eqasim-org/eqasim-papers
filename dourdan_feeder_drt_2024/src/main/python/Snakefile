@@ -20,6 +20,9 @@ simulations_output_path = os.path.join(base_output_path, "simulations")
 
 baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_trips.csv")
 
+baseline_simulation_memory = config["baseline_sim_meme"]
+service_simulation_memory = config["service_sim_mem"]
+
 rule all:
     input:
         baseline_trips_path
@@ -59,5 +62,5 @@ rule baseline_simulation:
         baseline_trips_path
     shell:
         """
-        java -cp "{jar_path}" org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
+        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
         """
