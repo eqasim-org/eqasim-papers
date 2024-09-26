@@ -9,6 +9,7 @@ import org.eqasim.core.simulation.modes.drt.mode_choice.DrtModeAvailabilityWrapp
 import org.eqasim.core.simulation.modes.feeder_drt.mode_choice.FeederDrtModeAvailabilityWrapper;
 import org.eqasim.ile_de_france.mode_choice.IDFModeAvailability;
 import org.eqasim.ile_de_france.mode_choice.IDFModeChoiceModule;
+import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.costs.FeederDrtCostModel;
 import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.parameters.CostParameters;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.config.Config;
@@ -21,6 +22,7 @@ public class ModeChoiceModule extends IDFModeChoiceModule {
 
     public static String SINGLE_USAGE_FLEETS_MODE_AVAILABILITY = "SingleUsageFleetsModeAvailability";
     public static String DUAL_USAGE_FLEETS_MODE_AVAILABILITY = "DualUsageFleetsModeAvailability";
+    public static String FEEDER_DRT_COST_MODEL = "FeederDrtCostModel";
 
     private final CommandLine commandLine;
 
@@ -35,6 +37,7 @@ public class ModeChoiceModule extends IDFModeChoiceModule {
 
         bindModeAvailability(SINGLE_USAGE_FLEETS_MODE_AVAILABILITY).to(FeederDrtModeAvailabilityWrapper.class);
         bindModeAvailability(DUAL_USAGE_FLEETS_MODE_AVAILABILITY).to(DrtModeAvailabilityWrapper.class);
+        bindCostModel(FEEDER_DRT_COST_MODEL).to(FeederDrtCostModel.class);
     }
 
 
