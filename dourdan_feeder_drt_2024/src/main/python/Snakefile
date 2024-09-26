@@ -1,0 +1,34 @@
+import os
+
+mvn_project_base_path = "../../../../"
+
+java_path = "'C:/Users/tarek.chouaki/.jdks/corretto-21.0.4/bin/java"
+pom_path = "../../../../pom.xml"
+mvn_path = "C:/Program Files/JetBrains/IntelliJ IDEA Community Edition 2023.1.4/plugins/maven/lib/maven3/bin/mvn"
+mvn_repository_path = ".m2/repository"
+
+jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "original-dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
+
+simulation_inputs_path = "C:/Users/tarek.chouaki/simulations/idf/25pct/idf_25pct_egt_240918/matsim_inputs"
+
+input_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config.xml")
+baseline_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config_baseline.xml")
+
+rule all:
+    input:
+        baseline_config_path
+
+rule compile:
+    output:
+        jar_path
+    shell:
+        '"{mvn_path}" package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+
+rule baseline_config:
+    input:
+        jar_path,
+        input_config_path
+    output:
+        baseline_config_path
+    shell:
+        '"{java_path}" -cp "{jar_path}" org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon --input-config-path="{input_config_path}" --output-config-path="{baseline_config_path}"'

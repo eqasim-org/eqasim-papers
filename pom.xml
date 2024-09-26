@@ -8,6 +8,9 @@
     <artifactId>papers</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <modules>
+        <module>dourdan_feeder_drt_2024</module>
+    </modules>
 
     <repositories>
         <repository>
@@ -27,7 +30,7 @@
         <dependency>
             <groupId>com.github.eqasim-org</groupId>
             <artifactId>eqasim-java</artifactId>
-            <version>ed29048</version>
+            <version>45fa736</version>
         </dependency>
     </dependencies>
 </project>
