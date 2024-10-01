@@ -23,6 +23,10 @@ baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_
 baseline_simulation_memory = config["baseline_sim_mem"]
 service_simulation_memory = config["service_sim_mem"]
 
+cut_simulation_prefix = config["area_prefix"]
+area_path = config["area_path"]
+cut_simulation_path = os.path.join(base_output_path, "scenarios", cut_simulation_prefix+"_scenario")
+
 rule all:
     input:
         baseline_trips_path
@@ -63,4 +67,16 @@ rule baseline_simulation:
     shell:
         """
         java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
+        """
+
+
+rule cut_simulation:
+    input:
+        jar_path,
+        baseline_trips_path
+    output:
+        os.path.join(cut_simulation_path, cut_simulation_prefix+"population.xml.gz")
+    shell:
+        """
+        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 --config-path
         """
