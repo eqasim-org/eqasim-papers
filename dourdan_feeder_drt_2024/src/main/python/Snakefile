@@ -78,5 +78,12 @@ rule cut_simulation:
         os.path.join(cut_simulation_path, cut_simulation_prefix+"population.xml.gz")
     shell:
         """
-        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 --config-path
+        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
+        --config-path={baseline_config_path} --plans-path={simulations_output_path}/baseline/output_plans.xml.gz \
+         --events-path={simulation_inputs_path}/baseline/output_events.xml.gz \
+         --vdf-travel-times-path={simulation_inputs_path}/baseline/vdf_travel_times.bin \
+         --extent-path={area_path} \
+         --prefix={cut_simulation_prefix} \
+         --flag-area-line-modes=true  \
+         --threads={threads_per_sim}
         """
