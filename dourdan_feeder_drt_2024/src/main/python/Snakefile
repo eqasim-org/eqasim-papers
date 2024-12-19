@@ -59,17 +59,17 @@ rule baseline_config:
         java -cp "{jar_path}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF --input-config-path="{baseline_config_path}" --output-config-path="{baseline_config_path}" --engine=true --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 --config:global.numberOfThreads={threads_per_sim}
         """
 
+"""
 rule baseline_simulation:
     input:
         baseline_config_path
     output:
         baseline_trips_path
     shell:
-        """
+        """ """
         java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
-        """
-
-
+        """ """
+"""
 rule cut_simulation:
     input:
         jar_path,
@@ -84,6 +84,7 @@ rule cut_simulation:
          --vdf-travel-times-path={simulation_inputs_path}/baseline/vdf_travel_times.bin \
          --extent-path={area_path} \
          --prefix={cut_simulation_prefix} \
-         --flag-area-line-modes=true  \
-         --threads={threads_per_sim}
+         --flag-area-link-modes=true  \
+         --threads={threads_per_sim} \
+         --output-path={cut_simulation_path}
         """
