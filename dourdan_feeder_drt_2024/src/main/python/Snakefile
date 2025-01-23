@@ -1,51 +1,73 @@
+
 import os
+import glob
 
-mvn_project_base_path = "../../../../"
+def to_absolute(in_path, ref_path):
+    if in_path is None:
+        return None
+    if os.path.isabs(in_path):
+        return in_path
+    return os.path.normpath(os.path.join(ref_path, in_path))
 
-pom_path = "../../../../pom.xml"
-mvn_repository_path = ".m2/repository"
+def repo_url_to_id(repo_url):
+    # SSH link example "git@github.com:eqasim-org/ile-de-france.git"
+    # HTTPS link example https://github.com/eqasim-org/ile-de-france.git
+    assert isinstance(repo_url, str)
+    if not repo_url.startswith("git@github.com") and not repo_url.startswith("https://github.com"):
+        raise Exception("Invalid repo_url")
+    components = repo_url.split("/")
+    repo_owner, repo_name = components[-2], components[-1]
+    repo_name = repo_name.replace(".git", "")
+    repo_owner = repo_owner.split(":")[-1]
+    return "%s/%s" % (repo_owner, repo_name)
 
-jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
-
+# General resources
 temp_path = config["temp_path"]
-original_simulation_files = config["simulation_inputs_path"]
 threads_per_sim = config["threads_per_sim"]
 
-simulation_inputs_path = os.path.join(temp_path, "simulation_inputs")
-input_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config.xml")
-baseline_config_path = os.path.join(simulation_inputs_path,"ile_de_france_config_baseline.xml")
 
-base_output_path = config["output_path"]
-simulations_output_path = os.path.join(base_output_path, "simulations")
+# Basic input simulation files related file paths
+original_simulation_files_location = to_absolute(config["simulation_inputs"]["path"], workflow.basedir)
+original_simulation_files_paths = [os.path.join(original_simulation_files_location, f) for f in os.listdir(original_simulation_files_location)]
 
-baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_trips.csv")
-
-baseline_simulation_memory = config["baseline_sim_mem"]
-service_simulation_memory = config["service_sim_mem"]
-
-cut_simulation_prefix = config["area_prefix"]
-area_path = config["area_path"]
-cut_simulation_path = os.path.join(base_output_path, "scenarios", cut_simulation_prefix+"_scenario")
-
-rule all:
-    input:
-        baseline_trips_path
+prefix = config["simulation_inputs"]["prefix"]
+# The locations of the files that input files after they will be copied
+simulation_inputs_location = os.path.join(temp_path,"simulation_inputs")
+simulation_files_paths = [os.path.join(simulation_inputs_location, f) for f in os.listdir(original_simulation_files_location)]
+# The name of the base config file (in the original location as well as in the copied one)
+input_config_file_name = "%sconfig.xml" % prefix
+input_config_path = os.path.join(simulation_inputs_location, input_config_file_name)
 
 rule copy_sim_files:
     input:
-        os.path.join(original_simulation_files, "ile_de_france_config.xml")
+        original_simulation_files_paths
     output:
-        os.path.join(simulation_inputs_path, "ile_de_france_config.xml")
+        simulation_files_paths
     shell:
         """
-        cp {original_simulation_files}/* {simulation_inputs_path}
+        cp {original_simulation_files_location}/* {simulation_inputs_location}
         """
 
+# Maven and Java related variables
+mvn_project_base_path = to_absolute("../../../../", workflow.basedir)
+pom_path = mvn_project_base_path + "pom.xml"
+mvn_repository_path = to_absolute(config["local_maven_repo"], workflow.basedir)
+java_sources_base_path = to_absolute("../java", workflow.basedir)
+java_sources_paths = [to_absolute(f, workflow.basedir) for f in glob.iglob(java_sources_base_path + "**/**", recursive=True) if os.path.isfile(f)]
+
+jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
+
 rule compile:
+    input:
+        java_sources_paths,
+        pom_path
     output:
         jar_path
     shell:
         'mvn package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+
+# Baseline (full) simulation config path
+baseline_config_path = os.path.join(simulation_inputs_location,"%sconfig_baseline.xml" % prefix)
 
 rule baseline_config:
     input:
@@ -59,32 +81,146 @@ rule baseline_config:
         java -cp "{jar_path}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF --input-config-path="{baseline_config_path}" --output-config-path="{baseline_config_path}" --engine=true --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 --config:global.numberOfThreads={threads_per_sim}
         """
 
-"""
-rule baseline_simulation:
+base_output_path = to_absolute(config["output_path"], workflow.basedir)
+simulations_output_path = os.path.join(base_output_path, "simulations")
+baseline_trips_path = os.path.join(simulations_output_path, "baseline", "eqasim_trips.csv")
+baseline_plans_path = os.path.join(simulations_output_path, "baseline", "output_plans.xml.gz")
+baseline_events_path = os.path.join(simulations_output_path, "baseline", "output_events.xml.gz")
+baseline_travel_times_path = os.path.join(simulations_output_path, "baseline", "vdf_travel_times.bin")
+
+baseline_simulation_memory = config["baseline_sim_mem"]
+
+rule global_simulation_baseline:
     input:
         baseline_config_path
     output:
-        baseline_trips_path
+        baseline_trips_path,
+        baseline_plans_path,
+        baseline_events_path
     shell:
-        """ """
+        '''
         java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
-        """ """
-"""
-rule cut_simulation:
+        '''
+
+
+cut_simulation_prefix = config["area_prefix"]
+area_path = config["area_path"]
+cut_simulation_path = os.path.join(base_output_path, "scenarios", cut_simulation_prefix+"scenario")
+cut_config_path = os.path.join(cut_simulation_path, "%sconfig.xml" % cut_simulation_prefix)
+
+rule cutter:
     input:
         jar_path,
-        baseline_trips_path
+        baseline_plans_path,
+        baseline_events_path
     output:
-        os.path.join(cut_simulation_path, cut_simulation_prefix+"population.xml.gz")
+        cut_config_path
     shell:
         """
         java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
-        --config-path={baseline_config_path} --plans-path={simulations_output_path}/baseline/output_plans.xml.gz \
-         --events-path={simulation_inputs_path}/baseline/output_events.xml.gz \
-         --vdf-travel-times-path={simulation_inputs_path}/baseline/vdf_travel_times.bin \
+        --config-path={baseline_config_path} --plans-path={baseline_plans_path} \
+         --events-path={baseline_events_path} \
+         --vdf-travel-times-path={baseline_travel_times_path} \
          --extent-path={area_path} \
          --prefix={cut_simulation_prefix} \
          --flag-area-link-modes=true  \
          --threads={threads_per_sim} \
          --output-path={cut_simulation_path}
         """
+
+
+
+cut_baseline_trips_path = os.path.join(simulations_output_path, "%sbaseline" % cut_simulation_prefix, "eqasim_trips.csv")
+service_simulation_memory = config["service_sim_mem"]
+
+rule area_simulation_baseline:
+    input:
+        jar_path,
+        cut_config_path,
+    output:
+        cut_baseline_trips_path
+    shell:
+        '''
+        java -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{service_simulation_memory_simulation_memory} -XX:MaxRAMPercentage=100.0 \
+        --config-path{cut_config_path} \
+        --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}baseline
+        '''
+
+drt_vehicles_location = os.path.join(temp_path, "scenarios", "%sdrt_vehicles" % cut_simulation_prefix)
+
+rule drt_vehicles:
+    input:
+        jar_path
+    output:
+        os.path.join(drt_vehicles_location, "drt_vehicles_{fleetSize}.xml")
+    shell:
+        '''
+        mkdir -p {drt_vehicles_location}
+        java -cp {jar_path} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
+        --network-path={cut_simulation_path}/{cut_simulation_prefix}network.xml.gz \
+        --vehicles-number={wildcards.fleetSize} \
+        --network-modes=inside_car \
+        --output-vehicles-path={drt_vehicles_location}/drt_vehicles_{wildcards.fleetSize}.xml
+        '''
+
+
+# This rule generates configuration files for Unimodal DRT services with the full transit schedule
+rule area_config_group1:
+    input:
+        jar_path,
+        cut_config_path,
+        os.path.join(drt_vehicles_location,"drt_vehicles_{fleetSize}.xml")
+    output:
+        os.path.join(cut_simulation_path, "%sconfig_drt_{fleetSize}vehicles.xml" % cut_simulation_prefix)
+    shell:
+        '''
+        java -cp org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt \
+        --input-config-path={cut_config_path} \
+        --vehicles-paths={drt_vehicles_location}/drt_vehicles_{wildcards.fleetSize}.xml \
+        --config:DiscreteModeChoice.modeAvailability=SingleUsageFleetsModeAvailability \
+        --output-config-path={cut_simulation_path}/{cut_simulation_prefix}_{wildcards.fleetSize}vehicles.xml \
+        '''
+
+
+demand_identification_fleet_size = config["service"]["demand_identification_fleet_size"]
+identified_demand_group1_plans_path = os.path.join(simulations_output_path, "%sdrt_%dvehicles/output_plans.xml.gz" % (cut_simulation_prefix, demand_identification_fleet_size))
+identified_demand_group1_trips_path = os.path.join(simulations_output_path, "%sdrt_%dvehicles/eqasim_trips.csv" % (cut_simulation_prefix, demand_identification_fleet_size))
+
+# This rule performs the group of simulations of Unimodal DRT services with the full Transit schedule
+rule area_simulation_group1_demand_identification:
+    input:
+        jar_path,
+        os.path.join(cut_simulation_path,"%sconfig_drt_%dvehicles.xml" % (cut_simulation_prefix, demand_identification_fleet_size))
+    output:
+        identified_demand_group1_plans_path,
+        identified_demand_group1_trips_path
+    shell:
+        '''
+        java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
+        --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{wildcards.fleetSize}vehicles.xml \
+        --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{wildcards.fleetSize}vehicles
+        '''
+
+# This rule performs the group of simulations of Unimodal DRT services with the full Transit schedule
+rule area_simulation_group1:
+    input:
+        jar_path,
+        os.path.join(cut_simulation_path,"%sconfig_drt_{fleetSize}vehicles.xml" % cut_simulation_prefix),
+        identified_demand_group1_plans_path
+    output:
+        os.path.join(simulations_output_path, "%sdrt_{fleetSize}vehicles/eqasim_trips.csv" % cut_simulation_prefix)
+    shell:
+        '''
+        java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
+        --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{wildcards.fleetSize}vehicles.xml \
+        --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{wildcards.fleetSize}vehicles \
+        --config:plans.inputPlansFile={identified_demand_group1_plans_path}
+        --config:controller.lastIteration=0
+        '''
+
+rule all:
+    default_target: True
+    input:
+        baseline_trips_path,
+        cut_baseline_trips_path,
+        [os.path.join(simulations_output_path, "%sdrt_%dvehicles/eqasim_trips.csv" % (cut_simulation_prefix, fleet_size)) for fleet_size in config["service"]["fleet_sizing"]]
