@@ -198,7 +198,7 @@ rule area_simulation_group1_demand_identification:
     shell:
         '''
         java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
-        --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{wildcards.fleetSize}vehicles.xml \
+        --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{demand_identification_fleet_size}vehicles.xml \
         --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{wildcards.fleetSize}vehicles
         '''
 
@@ -215,7 +215,7 @@ rule area_simulation_group1:
         java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
         --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{wildcards.fleetSize}vehicles.xml \
         --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{wildcards.fleetSize}vehicles \
-        --config:plans.inputPlansFile={identified_demand_group1_plans_path}
+        --config:plans.inputPlansFile={identified_demand_group1_plans_path} \
         --config:controller.lastIteration=0
         '''
 
