@@ -142,7 +142,7 @@ rule area_simulation_baseline:
         cut_baseline_trips_path
     shell:
         '''
-        java -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{service_simulation_memory_simulation_memory} -XX:MaxRAMPercentage=100.0 \
+        java -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{service_simulation_memory} -XX:MaxRAMPercentage=100.0 \
         --config-path{cut_config_path} \
         --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}baseline
         '''
