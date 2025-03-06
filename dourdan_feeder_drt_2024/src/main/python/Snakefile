@@ -23,7 +23,9 @@ def repo_url_to_id(repo_url):
 
 # General resources
 temp_path = config["temp_path"]
-threads_per_sim = config["threads_per_sim"]
+java_cmd = config["java_cmd"] if "java_cmd" in config else "java"
+mvn_cmd = config["mvn_cmd"] if "mvn_cmd" in config else "mvn"
+
 
 
 # Basic input simulation files related file paths
@@ -65,7 +67,7 @@ rule compile:
     output:
         jar_path
     shell:
-        'mvn package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+        '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
 # Baseline (full) simulation config path
 baseline_config_path = os.path.join(simulation_inputs_location,"%sconfig_baseline.xml" % prefix)
@@ -79,7 +81,7 @@ rule baseline_config:
     shell:
         """
         java -cp "{jar_path}" org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon --input-config-path="{input_config_path}" --output-config-path="{baseline_config_path}"
-        java -cp "{jar_path}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF --input-config-path="{baseline_config_path}" --output-config-path="{baseline_config_path}" --engine=true --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 --config:global.numberOfThreads={threads_per_sim}
+        java -cp "{jar_path}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF --input-config-path="{baseline_config_path}" --output-config-path="{baseline_config_path}" --engine=true --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 --config:global.numberOfThreads={config["global_simulations"]["threads"]}
         """
 
 base_output_path = to_absolute(config["output_path"], workflow.basedir)
@@ -89,7 +91,6 @@ baseline_plans_path = os.path.join(simulations_output_path, "baseline", "output_
 baseline_events_path = os.path.join(simulations_output_path, "baseline", "output_events.xml.gz")
 baseline_travel_times_path = os.path.join(simulations_output_path, "baseline", "vdf_travel_times.bin")
 
-baseline_simulation_memory = config["baseline_sim_mem"]
 
 rule global_simulation_baseline:
     input:
@@ -98,14 +99,17 @@ rule global_simulation_baseline:
         baseline_trips_path,
         baseline_plans_path,
         baseline_events_path
+    threads: config["global_simulations"]["threads"]
+    resources:
+        mem=config["global_simulations"]["memory"]
     shell:
         '''
-        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
+        {java_cmd} -cp "{jar_path}" -Xmx{config["global_simulations"]["memory"]} -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation --config-path="{baseline_config_path}" --config:controller.outputDirectory={simulations_output_path}/baseline
         '''
 
 
-cut_simulation_prefix = config["area_prefix"]
-area_path = config["area_path"]
+cut_simulation_prefix = config["sub_area"]["area_prefix"]
+area_path = config["sub_area"]["area_path"]
 cut_simulation_path = os.path.join(base_output_path, "scenarios", cut_simulation_prefix+"scenario")
 cut_config_path = os.path.join(cut_simulation_path, "%sconfig.xml" % cut_simulation_prefix)
 cut_network_path = os.path.join(cut_simulation_path, "%snetwork.xml.gz" % cut_simulation_prefix)
@@ -118,23 +122,25 @@ rule cutter:
     output:
         cut_config_path,
         cut_network_path
+    threads: config["global_simulations"]["threads"]
+    resources:
+        mem=config["global_simulations"]["memory"]
     shell:
         """
-        java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
+        {java_cmd} -cp "{jar_path}" -Xmx{config["global_simulations"]["memory"]} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
         --config-path={baseline_config_path} --plans-path={baseline_plans_path} \
          --events-path={baseline_events_path} \
          --vdf-travel-times-path={baseline_travel_times_path} \
          --extent-path={area_path} \
          --prefix={cut_simulation_prefix} \
          --flag-area-link-modes=true  \
-         --threads={threads_per_sim} \
+         --threads={config["global_simulations"]["threads"]} \
          --output-path={cut_simulation_path}
         """
 
 
 
 cut_baseline_trips_path = os.path.join(simulations_output_path, "%sbaseline" % cut_simulation_prefix, "eqasim_trips.csv")
-service_simulation_memory = config["service_sim_mem"]
 
 rule area_simulation_baseline:
     input:
@@ -142,10 +148,14 @@ rule area_simulation_baseline:
         cut_config_path,
     output:
         cut_baseline_trips_path
+    threads: config["area_simulations"]["threads"]
+    resources:
+        mem=config["area_simulations"]["memory"]
     shell:
         '''
-        java -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{service_simulation_memory} -XX:MaxRAMPercentage=100.0 \
+        {java_cmd} -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{config["area_simulations"]["memory"]} -XX:MaxRAMPercentage=100.0 \
         --config-path{cut_config_path} \
+        --config:global.numberOfThreads={config["area_simulations"]["threads"]} \
         --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}baseline
         '''
 
@@ -160,7 +170,7 @@ rule drt_vehicles:
     shell:
         '''
         mkdir -p {drt_vehicles_location}
-        java -cp {jar_path} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
+        {java_cmd} -cp {jar_path} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
         --network-path={cut_network_path} \
         --vehicles-number={wildcards.fleetSize} \
         --network-modes=inside_car \
@@ -178,7 +188,7 @@ rule area_config_group1:
         os.path.join(cut_simulation_path, "%sconfig_drt_{fleetSize}vehicles.xml" % cut_simulation_prefix)
     shell:
         '''
-        java -cp org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt \
+        {java_cmd} -cp org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt \
         --input-config-path={cut_config_path} \
         --vehicles-paths={drt_vehicles_location}/drt_vehicles_{wildcards.fleetSize}.xml \
         --config:DiscreteModeChoice.modeAvailability=SingleUsageFleetsModeAvailability \
@@ -198,11 +208,15 @@ rule area_simulation_group1_demand_identification:
     output:
         identified_demand_group1_plans_path,
         identified_demand_group1_trips_path
+    threads: config["area_simulations"]["threads"]
+    resources:
+        mem=config["area_simulations"]["memory"]
     shell:
         '''
-        java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
+        {java_cmd} -cp {jar_path} -Xmx{config["area_simulations"]["memory"]} org.eqasim.ile_de_france.RunSimulation \
         --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{demand_identification_fleet_size}vehicles.xml \
-        --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{demand_identification_fleet_size}vehicles
+        --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{demand_identification_fleet_size}vehicles \
+        --config:global.numberOfThreads={config["area_simulations"]["threads"]}
         '''
 
 # This rule performs the group of simulations of Unimodal DRT services with the full Transit schedule
@@ -213,18 +227,18 @@ rule area_simulation_group1:
         identified_demand_group1_plans_path
     output:
         os.path.join(simulations_output_path, "%sdrt_{fleetSize}vehicles/eqasim_trips.csv" % cut_simulation_prefix)
+    threads: config["area_simulations"]["threads"]
+    resources:
+        mem=config["area_simulations"]["memory"]
     shell:
         '''
-        java -cp {jar_path} -Xmx{service_simulation_memory} org.eqasim.ile_de_france.RunSimulation \
+        {java_cmd} -cp {jar_path} -Xmx{config["area_simulations"]["memory"]} org.eqasim.ile_de_france.RunSimulation \
         --config-path={cut_simulation_prefix}/{cut_simulation_prefix}config_drt_{wildcards.fleetSize}vehicles.xml \
         --config:controller.outputDirectory={simulations_output_path}/{cut_simulation_prefix}_drt_{wildcards.fleetSize}vehicles \
         --config:plans.inputPlansFile={identified_demand_group1_plans_path} \
-        --config:controller.lastIteration=0
+        --config:controller.lastIteration=0 \ 
+        --config:global.numberOfThreads={config["area_simulations"]["threads"]}
         '''
-
-run_scope = "all"
-if "run" in config:
-    run_scope = config["run"]
 
 
 rule all:
@@ -232,4 +246,4 @@ rule all:
     input:
         baseline_trips_path,
         cut_baseline_trips_path,
-        [os.path.join(simulations_output_path, "%sdrt_%dvehicles/eqasim_trips.csv" % (cut_simulation_prefix, fleet_size)) for fleet_size in config["service"]["fleet_sizing"]]
+        [os.path.join(simulations_output_path, "%sdrt_%dvehicles/eqasim_trips.csv" % (cut_simulation_prefix, fleet_size)) for fleet_size in config["service"]["fleet_sizing"] if fleet_size != demand_identification_fleet_size]
