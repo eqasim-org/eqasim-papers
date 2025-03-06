@@ -108,6 +108,7 @@ cut_simulation_prefix = config["area_prefix"]
 area_path = config["area_path"]
 cut_simulation_path = os.path.join(base_output_path, "scenarios", cut_simulation_prefix+"scenario")
 cut_config_path = os.path.join(cut_simulation_path, "%sconfig.xml" % cut_simulation_prefix)
+cut_network_path = os.path.join(cut_simulation_path, "%snetwork.xml.gz" % cut_simulation_prefix)
 
 rule cutter:
     input:
@@ -115,7 +116,8 @@ rule cutter:
         baseline_plans_path,
         baseline_events_path
     output:
-        cut_config_path
+        cut_config_path,
+        cut_network_path
     shell:
         """
         java -cp "{jar_path}" -Xmx{baseline_simulation_memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
@@ -151,14 +153,15 @@ drt_vehicles_location = os.path.join(temp_path, "scenarios", "%sdrt_vehicles" % 
 
 rule drt_vehicles:
     input:
-        jar_path
+        jar_path,
+        cut_network_path
     output:
         os.path.join(drt_vehicles_location, "drt_vehicles_{fleetSize}.xml")
     shell:
         '''
         mkdir -p {drt_vehicles_location}
         java -cp {jar_path} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
-        --network-path={cut_simulation_path}/{cut_simulation_prefix}network.xml.gz \
+        --network-path={cut_network_path} \
         --vehicles-number={wildcards.fleetSize} \
         --network-modes=inside_car \
         --output-vehicles-path={drt_vehicles_location}/drt_vehicles_{wildcards.fleetSize}.xml
@@ -218,6 +221,11 @@ rule area_simulation_group1:
         --config:plans.inputPlansFile={identified_demand_group1_plans_path} \
         --config:controller.lastIteration=0
         '''
+
+run_scope = "all"
+if "run" in config:
+    run_scope = config["run"]
+
 
 rule all:
     default_target: True
