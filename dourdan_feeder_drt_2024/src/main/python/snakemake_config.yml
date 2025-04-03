@@ -1,14 +1,25 @@
 temp_path: "temp"
-threads_per_sim: 10
+output_path: "outputs"
+local_maven_repo: ".m2/repository"
+java_cmd: "java"
+mvn_cmd: "mvn"
+
 simulation_inputs:
   path: "simulation_inputs"
   prefix: "ile_de_france_"
-output_path: "outputs"
-local_maven_repo: ".m2/repository"
-baseline_sim_mem: "40G"
-service_sim_mem: "5G"
-area_prefix: "drn_"
-area_path: "drn.shp"
+
+sub_area:
+  area_prefix: "drn_"
+  area_path: "drn.shp"
+
+global_simulations:
+  threads: 10
+  memory: "50G"
+
+area_simulations:
+  threads: 10
+  memory: "5G"
+
 service:
   demand_identification_fleet_size: 40
   fleet_sizing: [10, 20, 30, 50]
