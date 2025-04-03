@@ -1,0 +1,3 @@
+java:
+  java_cmd: "java"
+  mvn_cmd: "mvn"

@@ -1,39 +1,57 @@
-
 import os
 import glob
+import collections.abc
+
+def recursive_update(destination, source):
+    for k in destination.keys():
+        if k not in source:
+            raise Exception("Unexpected config element %s" % k)
+    for k, v in source.items():
+        if isinstance(v, collections.abc.Mapping):
+            destination[k] = recursive_update(destination.get(k, {}), v)
+        else:
+            destination[k] = v
+    return destination
 
 def to_absolute(in_path, ref_path):
     if in_path is None:
         return None
     if os.path.isabs(in_path):
         return in_path
-    return os.path.normpath(os.path.join(ref_path, in_path))
+    return os.path.normpath(os.path.join(ref_path,in_path))
 
 def repo_url_to_id(repo_url):
     # SSH link example "git@github.com:eqasim-org/ile-de-france.git"
     # HTTPS link example https://github.com/eqasim-org/ile-de-france.git
-    assert isinstance(repo_url, str)
+    assert isinstance(repo_url,str)
     if not repo_url.startswith("git@github.com") and not repo_url.startswith("https://github.com"):
         raise Exception("Invalid repo_url")
     components = repo_url.split("/")
     repo_owner, repo_name = components[-2], components[-1]
-    repo_name = repo_name.replace(".git", "")
+    repo_name = repo_name.replace(".git","")
     repo_owner = repo_owner.split(":")[-1]
     return "%s/%s" % (repo_owner, repo_name)
 
 
+default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"}}
+
+recursive_update(config, default_config)
+
 # Maven and Java related variables
-mvn_project_base_path = to_absolute("../../../../", workflow.basedir)
-pom_path = os.path.join(mvn_project_base_path, "pom.xml")
+mvn_project_base_path = to_absolute("../../../../",workflow.basedir)
+pom_path = os.path.join(mvn_project_base_path,"pom.xml")
 mvn_repository_path = to_absolute(".m2", workflow.basedir)
-java_sources_base_path = to_absolute("../java", workflow.basedir)
-java_sources_paths = [to_absolute(f, workflow.basedir) for f in glob.iglob(java_sources_base_path + "**/**", recursive=True) if os.path.isfile(f)]
+java_sources_base_path = to_absolute("../java",workflow.basedir)
+java_sources_paths = [to_absolute(f, workflow.basedir) for f in
+                      glob.iglob(java_sources_base_path + "**/**",recursive=True) if os.path.isfile(f)]
 
-jar_path = os.path.join(mvn_project_base_path, "dourdan_feeder_drt_2024", "target", "dourdan_feeder_drt_2024-1.0-SNAPSHOT.jar")
+jar_path = to_absolute(os.path.join("../../../../","target","gpe_2025-1.0-SNAPSHOT.jar"), workflow.basedir)
 
-mvn_cmd = "mvn"
 
-# This rule is meant to compile the ile_de_france package in eqasim-java into a Jar with all the dependencies
+mvn_cmd = config["java"]["mvn_cmd"]
+java_cmd = config["java"]["mvn_cmd"]
+
+# This rule compiles the current maven module into a standalone jar
 rule compile:
     input:
         java_sources_paths,
@@ -42,6 +60,7 @@ rule compile:
         jar_path
     shell:
         '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+
 
 
 rule all:
