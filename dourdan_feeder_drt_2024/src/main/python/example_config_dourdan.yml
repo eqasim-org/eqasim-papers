@@ -1,0 +1,14 @@
+temp_path: "temp"
+threads_per_sim: 10
+simulation_inputs:
+  path: "/mnt/data/tarek/simulations/idf/25pct/idf_25pct_egt_240918/matsim_inputs"
+  prefix: "ile_de_france_"
+output_path: "outputs"
+local_maven_repo: ".m2/repository"
+baseline_sim_mem: "40G"
+service_sim_mem: "5G"
+area_prefix: "drn_"
+area_path: "drn.shp"
+service:
+  demand_identification_fleet_size: 40
+  fleet_sizing: [10, 20, 30, 50]
