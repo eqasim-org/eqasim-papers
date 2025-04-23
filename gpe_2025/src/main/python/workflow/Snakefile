@@ -90,7 +90,7 @@ rule one_agent_per_trip:
         '''
         mkdir -p "$(dirname {output[0]})"
         {java_cmd} -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
-        --input-path={input.population} --override-mode={wildcards.mode} --output_path={output[0]}
+        --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
 rule run_population_routing:
