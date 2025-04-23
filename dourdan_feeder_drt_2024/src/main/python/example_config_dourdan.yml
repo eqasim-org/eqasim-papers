@@ -12,3 +12,8 @@ area_path: "drn.shp"
 service:
   demand_identification_fleet_size: 40
   fleet_sizing: [10, 20, 30, 50]
+  operational_schemes: ["door2door", "stopBased"]
+  prices: [0.3, 0.6, 0.9]
+  max_detours: ["50%", "20m"]
+  vehicle_capacities: [4, 8]
+  prebooking: [0, 10]
