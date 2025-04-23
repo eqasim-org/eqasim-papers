@@ -107,9 +107,33 @@ rule run_population_routing:
         --threads=10
         '''
 
+rule simulation:
+    input:
+        jar=jar_path,
+        config=""
+    params:
+        extra_args = ""
+    output:
+        output_path=""
+    shell:
+        '''
+        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation \
+        --config-path={input.config} --config:controller.outputDirectory={output.output_path} {params.extra_args}
+        '''
+
+use rule simulation as post_routing_simulation with:
+    input:
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    params:
+        extra_args = lambda wildcards, input: "--config:plans.inputPlansFile=%s" % input.plans
+    output:
+        output_path="%s/routing/outputs/simulated_{scenario}_{mode}" % output_path
+
+
 rule all:
     default_target: True
     input:
         jar_path,
-        "%s/routing/inputs/split_population_baseline_pt.xml.gz" % output_path,
-        "%s/routing/outputs/split_population_baseline_pt.xml.gz" % output_path
+        ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
+        ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios]
