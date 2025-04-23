@@ -1,6 +1,11 @@
 java:
   java_cmd: "java"
   mvn_cmd: "mvn"
-simulation:
-  control_path: "/path/to/control"
-  gpe_path: "/path/to/gpe"
+scenarios:
+  baseline:
+    path: "/path/to/baseline"
+    prefix: "ile_de_france_"
+  gpe:
+    path: "/path/to/gpe"
+    prefix: "ile_de_france"
+output_path: "/path/to/output"

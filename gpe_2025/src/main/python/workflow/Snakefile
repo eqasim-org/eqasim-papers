@@ -33,7 +33,8 @@ def repo_url_to_id(repo_url):
     return "%s/%s" % (repo_owner, repo_name)
 
 
-default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"}}
+default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"},
+                  "output_path": to_absolute("outputs", workflow.basedir)}
 
 recursive_update(config, default_config)
 
@@ -51,6 +52,24 @@ jar_path = to_absolute(os.path.join("../../../../","target","gpe_2025-1.0-SNAPSH
 mvn_cmd = config["java"]["mvn_cmd"]
 java_cmd = config["java"]["mvn_cmd"]
 
+
+# Scenario input related variables and utilitary functions
+scenarios = config["scenarios"]
+
+for s in scenarios:
+    s["path"] = to_absolute(s["path"], workflow.basedir)
+
+def get_simulation_input_file(input_file, scenario):
+    return os.path.join(scenarios[scenario]["path"], scenarios[scenario]["prefix"] + input_file)
+
+# Output related variables
+output_path = config["output_path"]
+
+
+wildcard_constraints:
+    scenario="[a-zA-Z]+",
+    mode="[a-zA-Z]+"
+
 # This rule compiles the current maven module into a standalone jar
 rule compile:
     input:
@@ -62,8 +81,23 @@ rule compile:
         '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
 
+## The following rules are related to the evaluation of quality of PT trips between the control and the GPE scenarios
+
+rule one_agent_per_trip:
+    input:
+        jar=jar_path,
+        population=lambda wildcards: get_simulation_input_file("population.xml.gz", wildcards.scenario),
+    output:
+        "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    shell:
+        '''
+        mkdir -p "$(dirname {output[0]})"
+        {java_cmd} -cp {jar_path} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
+        --input-path={input.population} --override-mode={wildcards.mode} --output_path={output[0]}
+        '''
 
 rule all:
     default_target: True
     input:
-        jar_path
+        jar_path,
+        "%s/routing/inputs/split_population_baseline_pt.xml.gz" % output_path
