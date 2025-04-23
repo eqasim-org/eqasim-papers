@@ -63,7 +63,7 @@ def get_simulation_input_file(input_file, scenario):
     return os.path.join(scenarios[scenario]["path"], scenarios[scenario]["prefix"] + input_file)
 
 # Output related variables
-output_path = config["output_path"]
+output_path = to_absolute(config["output_path"], workflow.basedir)
 
 
 wildcard_constraints:
