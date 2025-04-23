@@ -3,9 +3,6 @@ import glob
 import collections.abc
 
 def recursive_update(destination, source):
-    for k in destination.keys():
-        if k not in source:
-            raise Exception("Unexpected config element %s" % k)
     for k, v in source.items():
         if isinstance(v, collections.abc.Mapping):
             destination[k] = recursive_update(destination.get(k, {}), v)
