@@ -47,7 +47,7 @@ jar_path = to_absolute(os.path.join("../../../../","target","gpe_2025-1.0-SNAPSH
 
 
 mvn_cmd = config["java"]["mvn_cmd"]
-java_cmd = config["java"]["mvn_cmd"]
+java_cmd = config["java"]["java_cmd"]
 
 
 # Scenario input related variables and utilitary functions
@@ -89,12 +89,27 @@ rule one_agent_per_trip:
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {java_cmd} -cp {jar_path} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
+        {java_cmd} -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
         --input-path={input.population} --override-mode={wildcards.mode} --output_path={output[0]}
+        '''
+
+rule run_population_routing:
+    input:
+        jar=jar_path,
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    output:
+        "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    shell:
+        '''
+        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 -cp {input.jar} --org.eqasim.core.scenario.routing.RunPopulationRouting \
+        --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
+        --threads=10
         '''
 
 rule all:
     default_target: True
     input:
         jar_path,
-        "%s/routing/inputs/split_population_baseline_pt.xml.gz" % output_path
+        "%s/routing/inputs/split_population_baseline_pt.xml.gz" % output_path,
+        "%s/routing/outputs/split_population_baseline_pt.xml.gz" % output_path
