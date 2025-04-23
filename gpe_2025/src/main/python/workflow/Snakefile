@@ -136,4 +136,5 @@ rule all:
     input:
         jar_path,
         ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios]
+        ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
+        [directory("%s/routing/outputs/simulated_%s_pt" % (output_path, s)) for s in scenarios]
