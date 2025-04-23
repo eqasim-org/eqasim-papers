@@ -54,7 +54,7 @@ java_cmd = config["java"]["mvn_cmd"]
 scenarios = config["scenarios"]
 
 for s in scenarios:
-    s["path"] = to_absolute(s["path"], workflow.basedir)
+    scenarios[s]["path"] = to_absolute(scenarios[s]["path"], workflow.basedir)
 
 def get_simulation_input_file(input_file, scenario):
     return os.path.join(scenarios[scenario]["path"], scenarios[scenario]["prefix"] + input_file)
