@@ -1,3 +1,6 @@
 java:
   java_cmd: "java"
   mvn_cmd: "mvn"
+simulation:
+  control_path: "/path/to/control"
+  gpe_path: "/path/to/gpe"
