@@ -4,10 +4,10 @@ import collections.abc
 
 def recursive_update(destination, source):
     for k, v in source.items():
-        if isinstance(v, collections.abc.Mapping):
-            destination[k] = recursive_update(destination.get(k, {}), v)
-        else:
+        if k not in destination:
             destination[k] = v
+        elif isinstance(v, collections.abc.Mapping):
+            destination[k] = recursive_update(destination.get(k, {}), v)
     return destination
 
 def to_absolute(in_path, ref_path):
