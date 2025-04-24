@@ -53,6 +53,7 @@ public class OneAgentPerTrip {
                 newPerson.addPlan(plan);
                 newPerson.setSelectedPlan(plan);
                 population.addPerson(newPerson);
+                person.getAttributes().getAsMap().forEach(newPerson.getAttributes()::putAttribute);
             }
         }
 
