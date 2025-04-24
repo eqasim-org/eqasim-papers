@@ -117,7 +117,7 @@ rule simulation:
         output_path=""
     shell:
         '''
-        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 org.eqasim.ile_de_france.RunSimulation \
+        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.ile_de_france.RunSimulation \
         --config-path={input.config} --config:controller.outputDirectory={output.output_path} {params.extra_args}
         '''
 
