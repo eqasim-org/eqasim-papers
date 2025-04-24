@@ -123,6 +123,7 @@ rule simulation:
 
 use rule simulation as post_routing_simulation with:
     input:
+        jar=jar_path,
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
         plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     params:
