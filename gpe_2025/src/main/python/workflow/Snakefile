@@ -102,6 +102,7 @@ rule run_population_routing:
         "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     shell:
         '''
+        mkdir -p "$(dirname {output[0]})"
         {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
         --threads=10
