@@ -130,7 +130,7 @@ use rule simulation as post_routing_simulation with:
     params:
         extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:plans.inputPlansFile=%s" % input.plans
     output:
-        output_path="%s/routing/outputs/simulated_{scenario}_{mode}" % output_path
+        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
 
 
 rule all:
