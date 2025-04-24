@@ -126,7 +126,7 @@ use rule simulation as post_routing_simulation with:
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
         plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     params:
-        extra_args = lambda wildcards, input: "--config:plans.inputPlansFile=%s" % input.plans
+        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:plans.inputPlansFile=%s" % input.plans
     output:
         output_path="%s/routing/outputs/simulated_{scenario}_{mode}" % output_path
 
@@ -137,4 +137,4 @@ rule all:
         jar_path,
         ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
         ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        [directory("%s/routing/outputs/simulated_%s_pt" % (output_path, s)) for s in scenarios]
+        ["%s/routing/outputs/simulated_%s_pt/" % (output_path, s) for s in scenarios]
