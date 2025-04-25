@@ -31,6 +31,7 @@ def repo_url_to_id(repo_url):
 
 
 default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"},
+                  "resources": {"max-threads": 12, "memory": "50G"},
                   "output_path": to_absolute("outputs", workflow.basedir)}
 
 recursive_update(config, default_config)
@@ -49,6 +50,17 @@ jar_path = to_absolute(os.path.join("../../../../","target","gpe_2025-1.0-SNAPSH
 mvn_cmd = config["java"]["mvn_cmd"]
 java_cmd = config["java"]["java_cmd"]
 
+
+memory_str = config["resources"]["memory"]
+
+def memory_string_to_mb(memory_string):
+    assert isinstance(memory_string, str)
+    assert memory_string.endswith("G")
+    return int(memory_string[0:len(memory_string)-1]) * 1024
+
+memory_mb = memory_string_to_mb(config["resources"]["memory"])
+
+max_threads = min(config["resources"]["max-threads"], workflow.cores)
 
 # Scenario input related variables and utilitary functions
 scenarios = config["scenarios"]
@@ -74,6 +86,9 @@ rule compile:
         pom_path
     output:
         jar_path
+    threads: 4
+    resources:
+        memory_mb=4096
     shell:
         '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
@@ -86,6 +101,9 @@ rule one_agent_per_trip:
         population=lambda wildcards: get_simulation_input_file("population.xml.gz", wildcards.scenario),
     output:
         "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    threads: 4
+    resources:
+        memory_mb=4096
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -100,12 +118,17 @@ rule run_population_routing:
         plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     output:
         "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    params:
+        memory_str=memory_str
+    threads: max_threads
+    resources:
+        memory_mb=memory_mb
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
+        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
-        --threads=10
+        --threads={threads}
         '''
 
 rule simulation:
@@ -113,13 +136,18 @@ rule simulation:
         jar=jar_path,
         config=""
     params:
-        extra_args = ""
+        extra_args = "",
+        memory_str=memory_str
+    threads: min(max_threads, 12)
+    resources:
+        memory_mb=memory_mb
     output:
         output_path=""
     shell:
         '''
-        {java_cmd} -Xmx50G -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.ile_de_france.RunSimulation \
-        --config-path={input.config} --config:controller.outputDirectory={output.output_path} {params.extra_args}
+        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.ile_de_france.RunSimulation \
+        --config-path={input.config} --config:controller.outputDirectory={output.output_path} \
+        --config:global.numberOfThreads={threads} {params.extra_args}
         '''
 
 use rule simulation as post_routing_simulation with:
@@ -128,7 +156,11 @@ use rule simulation as post_routing_simulation with:
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
         plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     params:
-        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:plans.inputPlansFile=%s" % input.plans
+        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:swissRailRaptor.transferCalculation=Adaptive --config:plans.inputPlansFile=%s" % input.plans,
+        memory_str=memory_str
+    threads: min(max_threads, 12)
+    resources:
+        memory_mb=memory_mb
     output:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
 
