@@ -88,7 +88,7 @@ rule compile:
         jar_path
     threads: 4
     resources:
-        memory_mb=4096
+        mem_mb=4096
     shell:
         '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
@@ -103,7 +103,7 @@ rule one_agent_per_trip:
         "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     threads: 4
     resources:
-        memory_mb=4096
+        mem_mb=4096
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -122,7 +122,7 @@ rule run_population_routing:
         memory_str=memory_str
     threads: max_threads
     resources:
-        memory_mb=memory_mb
+        mem_mb=memory_mb
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -140,7 +140,7 @@ rule simulation:
         memory_str=memory_str
     threads: min(max_threads, 12)
     resources:
-        memory_mb=memory_mb
+        mem_mb=memory_mb
     output:
         output_path=""
     shell:
@@ -160,7 +160,7 @@ use rule simulation as post_routing_simulation with:
         memory_str=memory_str
     threads: min(max_threads, 12)
     resources:
-        memory_mb=memory_mb
+        mem_mb=memory_mb
     output:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
 
