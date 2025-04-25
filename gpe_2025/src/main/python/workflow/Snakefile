@@ -60,6 +60,8 @@ def memory_string_to_mb(memory_string):
 
 memory_mb = memory_string_to_mb(config["resources"]["memory"])
 
+java_memory_offset = 2048
+
 max_threads = min(config["resources"]["max-threads"], workflow.cores)
 
 # Scenario input related variables and utilitary functions
@@ -103,7 +105,7 @@ rule one_agent_per_trip:
         "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     threads: 4
     resources:
-        mem_mb=4096
+        mem_mb=4096 + java_memory_offset
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -122,7 +124,7 @@ rule run_population_routing:
         memory_str=memory_str
     threads: max_threads
     resources:
-        mem_mb=memory_mb
+        mem_mb=memory_mb + java_memory_offset
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -140,7 +142,7 @@ rule simulation:
         memory_str=memory_str
     threads: min(max_threads, 12)
     resources:
-        mem_mb=memory_mb
+        mem_mb=memory_mb + java_memory_offset
     output:
         output_path=""
     shell:
@@ -160,7 +162,7 @@ use rule simulation as post_routing_simulation with:
         memory_str=memory_str
     threads: min(max_threads, 12)
     resources:
-        mem_mb=memory_mb
+        mem_mb=memory_mb + java_memory_offset
     output:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
 
