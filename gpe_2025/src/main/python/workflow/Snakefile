@@ -107,7 +107,7 @@ rule one_agent_per_trip:
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {java_cmd} -cp -Xmx4G {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
+        {java_cmd} -Xmx4G -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
         --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
