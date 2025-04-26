@@ -30,7 +30,7 @@
         <dependency>
             <groupId>com.github.eqasim-org</groupId>
             <artifactId>eqasim-java</artifactId>
-            <version>555037d9f1</version>
+            <version>d3e43936a5</version>
         </dependency>
     </dependencies>
 </project>
