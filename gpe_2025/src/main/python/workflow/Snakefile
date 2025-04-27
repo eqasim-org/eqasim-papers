@@ -60,7 +60,7 @@ def memory_string_to_mb(memory_string):
 
 memory_mb = memory_string_to_mb(config["resources"]["memory"])
 
-java_memory_offset = 2048
+java_memory_offset = 10240
 
 max_threads = min(config["resources"]["max-threads"], workflow.cores)
 
