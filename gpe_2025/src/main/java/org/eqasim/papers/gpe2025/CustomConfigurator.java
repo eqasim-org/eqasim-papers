@@ -6,6 +6,8 @@ import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Leg;
 import org.matsim.core.config.CommandLine;
 
+import java.util.OptionalDouble;
+
 
 public class CustomConfigurator extends IDFConfigurator {
 
@@ -17,7 +19,7 @@ public class CustomConfigurator extends IDFConfigurator {
 
     public void adjustScenario(Scenario scenario) {
         super.adjustScenario(scenario);
-        double lastPersonEndTime = scenario.getPopulation().getPersons().values().stream()
+        OptionalDouble lastPersonEndTime = scenario.getPopulation().getPersons().values().stream()
                 .mapToDouble(p -> p.getSelectedPlan().getPlanElements().stream().mapToDouble(planElement -> {
                     if (planElement instanceof Activity activity) {
                         return activity.getEndTime().orElse(activity.getStartTime().orElse(-1));
@@ -27,8 +29,10 @@ public class CustomConfigurator extends IDFConfigurator {
                     throw new IllegalStateException("Unknown planElement type");
                 }).max().orElse(-1))
                 .filter(t -> t > 0)
-                .max().getAsDouble();
+                .max();
 
-        scenario.getConfig().qsim().setEndTime(Math.max(scenario.getConfig().qsim().getEndTime().orElse(-1), lastPersonEndTime + OFFSET));
+        if(lastPersonEndTime.isPresent()) {
+            scenario.getConfig().qsim().setEndTime(Math.max(scenario.getConfig().qsim().getEndTime().orElse(-1), lastPersonEndTime.getAsDouble() + OFFSET));
+        }
     }
 }
