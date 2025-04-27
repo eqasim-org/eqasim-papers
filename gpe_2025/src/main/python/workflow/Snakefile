@@ -147,7 +147,7 @@ rule simulation:
         output_path=""
     shell:
         '''
-        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.ile_de_france.RunSimulation \
+        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.papers.gpe2025.RunSimulation \
         --config-path={input.config} --config:controller.outputDirectory={output.output_path} \
         --config:global.numberOfThreads={threads} {params.extra_args}
         '''
