@@ -10,5 +10,13 @@ scenarios:
     prefix: "ile_de_france_"
   gpe:
     path: "/path/to/gpe"
-    prefix: "ile_de_france"
-output_path: "/path/to/output"
+    prefix: "ile_de_france_"
+  gpefeeder:
+    path: "/path/to/gpe"
+    prefix: "ile_de_france_"
+    feeders:
+      radiis: [200, 400, 600, 800, 1000]
+      speeds: [4.16]
+      frequencies: [300]
+
+output_path: "path/to/output"

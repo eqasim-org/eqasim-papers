@@ -70,7 +70,7 @@ scenarios = config["scenarios"]
 for s in scenarios:
     scenarios[s]["path"] = to_absolute(scenarios[s]["path"], workflow.basedir)
 
-def get_simulation_input_file(input_file, scenario):
+def get_simulation_input_file(input_file, scenario, **kwargs):
     return os.path.join(scenarios[scenario]["path"], scenarios[scenario]["prefix"] + input_file)
 
 # Output related variables
@@ -88,11 +88,13 @@ rule compile:
         pom_path
     output:
         jar_path
+    params:
+        mvn_cmd=mvn_cmd
     threads: 4
     resources:
         mem_mb=4096
     shell:
-        '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+        '{params.mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
 
 ## The following rules are related to the evaluation of quality of PT trips between the control and the GPE scenarios
@@ -106,10 +108,12 @@ rule one_agent_per_trip:
     threads: 4
     resources:
         mem_mb=4096 + java_memory_offset
+    params:
+        java_cmd=java_cmd
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {java_cmd} -Xmx4G -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
+        {params.java_cmd} -Xmx4G -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
         --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
@@ -121,14 +125,15 @@ rule run_population_routing:
     output:
         "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
     params:
-        memory_str=memory_str
+        memory_str=memory_str,
+        java_cmd=java_cmd
     threads: max_threads
     resources:
         mem_mb=memory_mb + java_memory_offset
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
+        {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
         --threads={threads}
         '''
@@ -139,7 +144,8 @@ rule simulation:
         config=""
     params:
         extra_args = "",
-        memory_str=memory_str
+        memory_str=memory_str,
+        java_cmd=java_cmd
     threads: min(max_threads, 12)
     resources:
         mem_mb=memory_mb + java_memory_offset
@@ -147,7 +153,7 @@ rule simulation:
         output_path=""
     shell:
         '''
-        {java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.papers.gpe2025.RunSimulation \
+        {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.papers.gpe2025.RunSimulation \
         --config-path={input.config} --config:controller.outputDirectory={output.output_path} \
         --config:global.numberOfThreads={threads} {params.extra_args}
         '''
@@ -167,10 +173,89 @@ use rule simulation as post_routing_simulation with:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
 
 
+rule run_population_routing_with_feeders:
+    input:
+        jar=jar_path,
+        config="%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path,
+        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+    output:
+        "%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % output_path
+    params:
+        memory_str=memory_str,
+        java_cmd=java_cmd,
+        scenario_path=lambda wildcards: scenarios[wildcards.scenario]["path"]
+    threads: max_threads
+    resources:
+        mem_mb=memory_mb + java_memory_offset
+    shell:
+        '''
+        cp {input.config} {params.scenario_path}/config_abstract_access_{wildcards.radius}_{wildcards.frequency}_{wildcards.speed_index}.xml
+        mkdir -p "$(dirname {output[0]})"
+        {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
+        --config-path={params.scenario_path}/config_abstract_access_{wildcards.radius}_{wildcards.frequency}_{wildcards.speed_index}.xml --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
+        --threads={threads}
+        '''
+
+
+use rule simulation as post_routing_simulation_with_feeders with:
+    input:
+        jar=jar_path,
+        config="%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path,
+        plans="%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % output_path
+    params:
+        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:swissRailRaptor.transferCalculation=Adaptive --config:plans.inputPlansFile=%s" % input.plans,
+        memory_str=memory_str,
+        scenario_path=lambda wildcards: scenarios[wildcards.scenario]["path"]
+    threads: min(max_threads, 12)
+    resources:
+        mem_mb=memory_mb + java_memory_offset
+    output:
+        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}_{radius}_{frequency}_{speed_index}" % output_path)
+
+# Creates abstract accesses items files
+rule create_abstract_accesses:
+    params:
+        radius=lambda wildcards: wildcards.radius,
+        speed=lambda wildcards: scenarios[wildcards.scenario]["feeders"]["speeds"][int(wildcards.speed_index)],
+        using_routed_distance=False,
+        access_type="bus",
+        frequency=lambda wildcards: wildcards.frequency
+    resources:
+        mem_mb=512
+    output:
+        "%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % output_path
+    threads: 1
+    script:
+        "../scripts/create_abstract_accesses.py"
+
+# Create config files
+rule edit_config:
+    input:
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        abstract_access_items="%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % output_path,
+        jar=jar_path
+    output:
+        "%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path
+    params:
+        java_cmd=java_cmd,
+    shell:
+        '''
+        {params.java_cmd} -cp {input.jar} org.eqasim.core.scenario.config.EditConfig \
+        --input-path={input.config} --output-path={output[0]} --add-module:transitWithAbstractAccess \
+        --config:transitWithAbstractAccess.accessItemsFilePath={input.abstract_access_items} \
+        --config:transitWithAbstractAccess.modeName=transitWithAbstractAccess
+        '''
+
 rule all:
     default_target: True
     input:
         jar_path,
-        ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        ["%s/routing/outputs/simulated_%s_pt/" % (output_path, s) for s in scenarios]
+        # ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
+        # ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
+        # ["%s/routing/outputs/simulated_%s_pt/" % (output_path, s) for s in scenarios],
+        # ["%s/abstract_accesses/items/gpefeeder/200_300_0.xml" % output_path],
+        [expand("%s/routing/outputs/split_population_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}.xml.gz" % (output_path, s),
+            radius=scenarios[s]["feeders"]["radiis"],
+            frequency=scenarios[s]["feeders"]["frequencies"],
+            speed_index=list(range(len(scenarios[s]["feeders"]["speeds"])))
+            ) for s in scenarios if "feeders" in scenarios[s]]
