@@ -42,6 +42,7 @@ default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"},
 recursive_update(config, default_config)
 config_object = PipelineConfig(config, workflow.basedir, workflow.cores)
 
+
 # Maven and Java related variables
 mvn_project_base_path = to_absolute("../../../../", workflow.basedir)
 pom_path = os.path.join(mvn_project_base_path, "pom.xml")
@@ -326,11 +327,18 @@ rule routing_feeder_analysis:
     notebook:
         "../notebooks/routing_feeder_analysis.ipynb"
 
+rule mode_choice_feeder_analysis:
+    input:
+        feeder_outputs=lambda wildcards: get_feeder_mode_choice_outputs([config_object.scenarios[wildcards.scenario]]),
+        no_feeder_outputs=lambda wildcards: "%s/mode_choice/outputs/outputs_simulated/%s" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+    output:
+        "%s/mode_choice/analysis_{analysis}" % config_object.output_path
+
 rule all:
     default_target: True
     input:
         get_feeder_routed_outputs(),
         get_feeder_mode_choice_outputs(),
         [["%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, s.scenario_name),
-          "%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name)] for s in config_object.scenarios.values() if s.feeders is not None],
+          "%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name)] for s in config_object.scenarios.values() if s.feeders is None],
         ["%s/routing/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in config_object.scenarios.values() if s.feeders is not None]
