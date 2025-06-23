@@ -1,0 +1,31 @@
+java:
+  java_cmd: "java"
+  mvn_cmd: "mvn"
+resources:
+  max-threads: 4
+  memory: "10G"
+scenarios:
+  nofeeder:
+    path: "../test_data"
+    prefix: "reduced_"
+  feeder:
+    path: "../test_data"
+    prefix: "reduced_"
+    feeders:
+      radiis: [ 200, 400 ] # The possible values for the feeder radius in meters
+      speeds: [ 4.16 ] # The possible speeds for the feeder services in m/s
+      frequencies: [ 300 ] # The possible frequencies in seconds
+      no_feeder_counterpart: "nofeeder" # We use this for the analysis, this scenario will be loaded as the feeder with 0 feeder radius
+
+output_path: "../outputs"
+# Work in progress below
+analyses:
+  base_gpe_impact:
+    type: routing
+    scenarios:
+      nofeeder:
+      feeder:
+        feeder_setting:
+          radius: 200
+          speed: 4.16
+          frequency: 300

@@ -33,18 +33,18 @@ def generate_access_xml(
 
 ## TODO put this in a file
 transit_stop_ids = {
-    "IDFM:monomodalStopPlace:59354.link:pt_IDFM:monomodalStopPlace:59354" : "Antonypole - Wissous Centre",
+#    "IDFM:monomodalStopPlace:59354.link:pt_IDFM:monomodalStopPlace:59354" : "Antonypole - Wissous Centre",
     "IDFM:monomodalStopPlace:59355.link:pt_IDFM:monomodalStopPlace:59355" : "Massy Opéra",
-    "IDFM:monomodalStopPlace:59357.link:pt_IDFM:monomodalStopPlace:59357" : "Marguerite Perey",
-    "IDFM:monomodalStopPlace:59358.link:pt_IDFM:monomodalStopPlace:59358" : "Moulon Campus",
-    "IDFM:monomodalStopPlace:59359.link:pt_IDFM:monomodalStopPlace:59359" : "Christ de Saclay",
-    "IDFM:monomodalStopPlace:59360.link:pt_IDFM:monomodalStopPlace:59360" : "Guyancourt",
-    "IDFM:monomodalStopPlace:59361.link:pt_IDFM:monomodalStopPlace:59361" : "Satory",
-    "IDFM:monomodalStopPlace:59347.link:pt_IDFM:monomodalStopPlace:59347" : "Le Bourget - Aéroport",
-    "IDFM:monomodalStopPlace:59348.link:pt_IDFM:monomodalStopPlace:59348" : "Gonesse",
-    "IDFM:monomodalStopPlace:59352.link:pt_IDFM:monomodalStopPlace:59352" : "Le Mesnil-Amelot",
-    "IDFM:monomodalStopPlace:59341.link:pt_IDFM:monomodalStopPlace:59341" : "Parc du Blanc-Mesnil",
-    "IDFM:monomodalStopPlace:59342.link:pt_IDFM:monomodalStopPlace:59342" : "Aulnay Val Francilia",
+#    "IDFM:monomodalStopPlace:59357.link:pt_IDFM:monomodalStopPlace:59357" : "Marguerite Perey",
+#    "IDFM:monomodalStopPlace:59358.link:pt_IDFM:monomodalStopPlace:59358" : "Moulon Campus",
+#    "IDFM:monomodalStopPlace:59359.link:pt_IDFM:monomodalStopPlace:59359" : "Christ de Saclay",
+#    "IDFM:monomodalStopPlace:59360.link:pt_IDFM:monomodalStopPlace:59360" : "Guyancourt",
+#     "IDFM:monomodalStopPlace:59361.link:pt_IDFM:monomodalStopPlace:59361" : "Satory",
+#     "IDFM:monomodalStopPlace:59347.link:pt_IDFM:monomodalStopPlace:59347" : "Le Bourget - Aéroport",
+#    "IDFM:monomodalStopPlace:59348.link:pt_IDFM:monomodalStopPlace:59348" : "Gonesse",
+#    "IDFM:monomodalStopPlace:59352.link:pt_IDFM:monomodalStopPlace:59352" : "Le Mesnil-Amelot",
+#    "IDFM:monomodalStopPlace:59341.link:pt_IDFM:monomodalStopPlace:59341" : "Parc du Blanc-Mesnil",
+#    "IDFM:monomodalStopPlace:59342.link:pt_IDFM:monomodalStopPlace:59342" : "Aulnay Val Francilia",
 }
 
 generate_access_xml(

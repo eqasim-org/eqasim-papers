@@ -1,6 +1,18 @@
 import os
 import glob
 import collections.abc
+import pickle
+import json
+import sys
+import importlib.util
+
+spec = importlib.util.spec_from_file_location("lib", "lib/__init__.py")
+module_obj = importlib.util.module_from_spec(spec)
+sys.modules["lib"] = module_obj
+spec.loader.exec_module(module_obj)
+
+from lib import PipelineConfig
+from lib import to_absolute
 
 def recursive_update(destination, source):
     for k, v in source.items():
@@ -9,13 +21,6 @@ def recursive_update(destination, source):
         elif isinstance(v, collections.abc.Mapping):
             destination[k] = recursive_update(destination.get(k, {}), v)
     return destination
-
-def to_absolute(in_path, ref_path):
-    if in_path is None:
-        return None
-    if os.path.isabs(in_path):
-        return in_path
-    return os.path.normpath(os.path.join(ref_path,in_path))
 
 def repo_url_to_id(repo_url):
     # SSH link example "git@github.com:eqasim-org/ile-de-france.git"
@@ -35,6 +40,7 @@ default_config = {"java": {"java_cmd": "java", "mvn_cmd": "mvn"},
                   "output_path": to_absolute("outputs", workflow.basedir)}
 
 recursive_update(config, default_config)
+config_object = PipelineConfig(config, workflow.basedir, workflow.cores)
 
 # Maven and Java related variables
 mvn_project_base_path = to_absolute("../../../../", workflow.basedir)
@@ -62,24 +68,37 @@ memory_mb = memory_string_to_mb(config["resources"]["memory"])
 
 java_memory_offset = 10240
 
-max_threads = min(config["resources"]["max-threads"], workflow.cores)
-
-# Scenario input related variables and utilitary functions
-scenarios = config["scenarios"]
-
-for s in scenarios:
-    scenarios[s]["path"] = to_absolute(scenarios[s]["path"], workflow.basedir)
-
 def get_simulation_input_file(input_file, scenario, **kwargs):
-    return os.path.join(scenarios[scenario]["path"], scenarios[scenario]["prefix"] + input_file)
-
-# Output related variables
-output_path = to_absolute(config["output_path"], workflow.basedir)
+    return os.path.join(config_object.output_path, "cache/inputs/%s" % scenario, config_object.scenarios[scenario].prefix + input_file)
 
 
 wildcard_constraints:
     scenario="[a-zA-Z]+",
-    mode="[a-zA-Z]+"
+    mode="[a-zA-Z]+",
+    remaining="(_.+){0,1}"
+
+# We need to create the input copying rules in a procedural way because we need the scenario prefix in the output path
+for scenario in config_object.scenarios.values():
+    rule:
+        name:
+            f"copy_{scenario.scenario_name}_inputs"
+        input:
+            scenario.path
+        output:
+            # We mention as outputs of this rules the files that are explicitly referenced by other rules
+            # But still we copy all the directory content
+            "%s/cache/inputs/%s/%sconfig.xml" % (config_object.output_path, scenario.scenario_name, scenario.prefix),
+            "%s/cache/inputs/%s/%spopulation.xml.gz" % (config_object.output_path, scenario.scenario_name, scenario.prefix)
+        params:
+            outputs_location = lambda wildcards, output: os.path.dirname(output[0])
+        shell:
+            '''
+            pwd
+            echo "Creating folder {params.outputs_location}"
+            mkdir -p {params.outputs_location}
+            echo "Copying files into {params.outputs_location}"
+            cp {input[0]}/* {params.outputs_location}/
+            '''
 
 # This rule compiles the current maven module into a standalone jar
 rule compile:
@@ -89,7 +108,7 @@ rule compile:
     output:
         jar_path
     params:
-        mvn_cmd=mvn_cmd
+        mvn_cmd=config_object.java.mvn_cmd
     threads: 4
     resources:
         mem_mb=4096
@@ -97,19 +116,19 @@ rule compile:
         '{params.mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
 
 
-## The following rules are related to the evaluation of quality of PT trips between the control and the GPE scenarios
-
+# The following rules are related to the evaluation of quality of PT trips between the control and the GPE scenarios
+# First, this rule processes the population so that each agent has only one trip and all trips are set to a certain mode
 rule one_agent_per_trip:
     input:
         jar=jar_path,
         population=lambda wildcards: get_simulation_input_file("population.xml.gz", wildcards.scenario),
     output:
-        "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+        "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
     threads: 4
     resources:
         mem_mb=4096 + java_memory_offset
     params:
-        java_cmd=java_cmd
+        java_cmd=config_object.java.java_cmd
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
@@ -117,17 +136,19 @@ rule one_agent_per_trip:
         --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
+# The rule below performs the population routing.
+# The base version of this rule takes the initial configuration of the scenario as well as the split plans
 rule run_population_routing:
     input:
         jar=jar_path,
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
-        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
     output:
-        "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+        "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
     params:
-        memory_str=memory_str,
-        java_cmd=java_cmd
-    threads: max_threads
+        memory_str=config_object.resources.memory,
+        java_cmd=config_object.java.java_cmd
+    threads: config_object.resources.max_threads
     resources:
         mem_mb=memory_mb + java_memory_offset
     shell:
@@ -138,15 +159,25 @@ rule run_population_routing:
         --threads={threads}
         '''
 
+# The following rule is an override of the previous one focusing on routing trips in a specific feeder setting
+use rule run_population_routing as run_population_routing_with_feeders with:
+    input:
+        jar=jar_path,
+        config="%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path,
+        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
+    output:
+        "%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % config_object.output_path
+
+# This rule is a generic one that allows to perform simulations
 rule simulation:
     input:
         jar=jar_path,
         config=""
     params:
         extra_args = "",
-        memory_str=memory_str,
-        java_cmd=java_cmd
-    threads: min(max_threads, 12)
+        memory_str=config_object.resources.memory,
+        java_cmd=config_object.java.java_cmd
+    threads: min(config_object.resources.max_threads, 12)
     resources:
         mem_mb=memory_mb + java_memory_offset
     output:
@@ -158,104 +189,148 @@ rule simulation:
         --config:global.numberOfThreads={threads} {params.extra_args}
         '''
 
+# This rule performs simulations of split populations that were previously routed
 use rule simulation as post_routing_simulation with:
     input:
         jar=jar_path,
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
-        plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+        plans="%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
     params:
         extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:swissRailRaptor.transferCalculation=Adaptive --config:plans.inputPlansFile=%s" % input.plans,
-        memory_str=memory_str
-    threads: min(max_threads, 12)
-    resources:
-        mem_mb=memory_mb + java_memory_offset
     output:
-        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % output_path)
+        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % config_object.output_path)
 
 
-rule run_population_routing_with_feeders:
+
+use rule post_routing_simulation as post_routing_simulation_with_feeders with:
     input:
         jar=jar_path,
-        config="%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path,
-        plans="%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % output_path
+        config="%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path,
+        plans="%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % config_object.output_path
     output:
-        "%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % output_path
+        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}_{radius}_{frequency}_{speed_index}" % config_object.output_path)
+
+
+rule mode_choice:
+    input:
+        jar=jar_path,
+        config=""
     params:
-        memory_str=memory_str,
-        java_cmd=java_cmd,
-        scenario_path=lambda wildcards: scenarios[wildcards.scenario]["path"]
-    threads: max_threads
+        extra_args="",
+        memory_str=config_object.resources.memory,
+        java_cmd=java_cmd
+    threads:
+        config_object.resources.max_threads
     resources:
         mem_mb=memory_mb + java_memory_offset
+    output:
+        output_path=""
     shell:
         '''
-        cp {input.config} {params.scenario_path}/config_abstract_access_{wildcards.radius}_{wildcards.frequency}_{wildcards.speed_index}.xml
-        mkdir -p "$(dirname {output[0]})"
-        {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
-        --config-path={params.scenario_path}/config_abstract_access_{wildcards.radius}_{wildcards.frequency}_{wildcards.speed_index}.xml --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
-        --threads={threads}
+        {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.standalone_mode_choice.RunStandaloneModeChoice \
+        --config-path={input.config} --config:standaloneModeChoice.outputDirectory={output.output_path} \
+        --config:standaloneModeChoice.removePersonsWithNoValidAlternatives=true --config:global.numberOfThreads={threads} {params.extra_args}
         '''
 
-
-use rule simulation as post_routing_simulation_with_feeders with:
+use rule mode_choice as regular_mode_choice with:
     input:
         jar=jar_path,
-        config="%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path,
-        plans="%s/routing/outputs/split_population_{scenario}_{mode}_{radius}_{frequency}_{speed_index}.xml.gz" % output_path
-    params:
-        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:swissRailRaptor.transferCalculation=Adaptive --config:plans.inputPlansFile=%s" % input.plans,
-        memory_str=memory_str,
-        scenario_path=lambda wildcards: scenarios[wildcards.scenario]["path"]
-    threads: min(max_threads, 12)
-    resources:
-        mem_mb=memory_mb + java_memory_offset
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario)
     output:
-        output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}_{radius}_{frequency}_{speed_index}" % output_path)
+        output_path=directory("%s/mode_choice/outputs/{scenario}" % config_object.output_path)
+
+use rule mode_choice as feeder_mode_choice with:
+    input:
+        jar=jar_path,
+        config="%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path
+    output:
+        output_path=directory("%s/mode_choice/outputs/{scenario}_{radius}_{frequency}_{speed_index}" % config_object.output_path)
+
+use rule simulation as post_mode_choice_simulation with:
+    input:
+        jar=jar_path,
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        mode_choice_outputs="%s/mode_choice/outputs/{scenario}{remaining}" % config_object.output_path
+    output:
+        output_path=directory("%s/mode_choice/outputs_simulated/{scenario}{remaining}" % config_object.output_path)
+    params:
+        extra_args = lambda wildcards, input: "--config:controller.lastIteration=0 --config:swissRailRaptor.transferCalculation=Adaptive --config:plans.inputPlansFile=%s/output_plans.xml.gz" % input.mode_choice_outputs
 
 # Creates abstract accesses items files
 rule create_abstract_accesses:
     params:
         radius=lambda wildcards: wildcards.radius,
-        speed=lambda wildcards: scenarios[wildcards.scenario]["feeders"]["speeds"][int(wildcards.speed_index)],
+        speed=lambda wildcards: config_object.scenarios[wildcards.scenario].feeders.speeds[int(wildcards.speed_index)],
         using_routed_distance=False,
         access_type="bus",
         frequency=lambda wildcards: wildcards.frequency
     resources:
         mem_mb=512
     output:
-        "%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % output_path
+        "%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % config_object.output_path
     threads: 1
     script:
         "../scripts/create_abstract_accesses.py"
 
 # Create config files
-rule edit_config:
+rule adapt_config:
     input:
         config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
-        abstract_access_items="%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % output_path,
+        abstract_access_items="%s/abstract_accesses/items/{scenario}/{radius}_{frequency}_{speed_index}.xml" % config_object.output_path,
         jar=jar_path
     output:
-        "%s/abstract_accesses/config_abstract_access_{scenario}_{radius}_{frequency}_{speed_index}.xml" % output_path
+        "%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path
     params:
         java_cmd=java_cmd,
     shell:
         '''
-        {params.java_cmd} -cp {input.jar} org.eqasim.core.scenario.config.EditConfig \
-        --input-path={input.config} --output-path={output[0]} --add-module:transitWithAbstractAccess \
-        --config:transitWithAbstractAccess.accessItemsFilePath={input.abstract_access_items} \
-        --config:transitWithAbstractAccess.modeName=transitWithAbstractAccess
+        {params.java_cmd} -cp {input.jar} org.eqasim.core.simulation.modes.transit_with_abstract_access.utils.AdaptConfigForTransitWithAbstractAccess \
+        --accesses-file-path={input.abstract_access_items} \
+        --mode-name=transitWithAbstractAccess --input-config-path={input.config} --output-config-path={output[0]}
         '''
+
+
+def get_feeder_routed_outputs(scenarios=None):
+    if scenarios is None:
+        scenarios = [s for s in  config_object.scenarios.values() if s.feeders is not None]
+    l = [expand("%s/routing/outputs/simulated_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}" % (config_object.output_path, s.scenario_name),
+        radius=s.feeders.radiis,
+        frequency=s.feeders.frequencies,
+        speed_index=list(range(len(s.feeders.speeds))))  for s in scenarios]
+    return flatten(l)
+
+def get_feeder_mode_choice_outputs(scenarios=None):
+    if scenarios is None:
+        scenarios = [s for s in  config_object.scenarios.values() if s.feeders is not None]
+    l = [expand("%s/mode_choice/outputs_simulated/%s_{radius}_{frequency}_{speed_index}" % (config_object.output_path, s.scenario_name),
+        radius=s.feeders.radiis,
+        frequency=s.feeders.frequencies,
+        speed_index=list(range(len(s.feeders.speeds))))  for s in scenarios]
+    return flatten(l)
+
+rule routing_feeder_analysis:
+    input:
+        feeder_outputs=lambda wildcards: get_feeder_routed_outputs([config_object.scenarios[wildcards.scenario]]),
+        no_feeder_outputs=lambda wildcards: "%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+    params:
+        config = config,
+        pipeline_kwargs = dict(basedir=workflow.basedir, max_cores=workflow.cores),
+        # Multiple Named input parameters that are lists get converted into one list losing the names
+        # So I have to put them again as parameters here
+        feeder_outputs = lambda wildcards: get_feeder_routed_outputs([config_object.scenarios[wildcards.scenario]]),
+        no_feeder_outputs = lambda wildcards: "%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else None
+    output:
+        "%s/routing/feeder_analyses/{scenario}.ipynb" % config_object.output_path
+    log:
+        notebook="%s/routing/feeder_analyses/{scenario}.ipynb" % config_object.output_path
+    notebook:
+        "../notebooks/routing_feeder_analysis.ipynb"
 
 rule all:
     default_target: True
     input:
-        jar_path,
-        # ["%s/routing/inputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        # ["%s/routing/outputs/split_population_%s_pt.xml.gz" % (output_path, s) for s in scenarios],
-        # ["%s/routing/outputs/simulated_%s_pt/" % (output_path, s) for s in scenarios],
-        # ["%s/abstract_accesses/items/gpefeeder/200_300_0.xml" % output_path],
-        [expand("%s/routing/outputs/split_population_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}.xml.gz" % (output_path, s),
-            radius=scenarios[s]["feeders"]["radiis"],
-            frequency=scenarios[s]["feeders"]["frequencies"],
-            speed_index=list(range(len(scenarios[s]["feeders"]["speeds"])))
-            ) for s in scenarios if "feeders" in scenarios[s]]
+        get_feeder_routed_outputs(),
+        get_feeder_mode_choice_outputs(),
+        [["%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, s.scenario_name),
+          "%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name)] for s in config_object.scenarios.values() if s.feeders is not None],
+        ["%s/routing/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in config_object.scenarios.values() if s.feeders is not None]
