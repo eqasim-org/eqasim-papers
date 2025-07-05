@@ -62,10 +62,15 @@ memory_str = config["resources"]["memory"]
 
 def memory_string_to_mb(memory_string):
     assert isinstance(memory_string, str)
-    assert memory_string.endswith("G")
-    return int(memory_string[0:len(memory_string)-1]) * 1024
+    nb = int(memory_string[0:len(memory_string)-1])
+    if memory_str.endswith("G"):
+        nb *= 1024
+    elif memory_str.endswith("M"):
+        raise Exception("Bad memory format")
+    return nb
 
-memory_mb = memory_string_to_mb(config["resources"]["memory"])
+memory_mb = memory_string_to_mb(config_object.resources.memory)
+analysis_memory_mb = memory_string_to_mb(config_object.resources.analysis_memory)
 
 java_memory_offset = 10240
 
@@ -92,6 +97,9 @@ for scenario in config_object.scenarios.values():
             "%s/cache/inputs/%s/%spopulation.xml.gz" % (config_object.output_path, scenario.scenario_name, scenario.prefix)
         params:
             outputs_location = lambda wildcards, output: os.path.dirname(output[0])
+        threads: 1
+        resources:
+            mem_mb=1024
         shell:
             '''
             pwd
@@ -110,7 +118,7 @@ rule compile:
         jar_path
     params:
         mvn_cmd=config_object.java.mvn_cmd
-    threads: 4
+    threads: min(config_object.resources.max_threads, 4)
     resources:
         mem_mb=4096
     shell:
@@ -125,15 +133,16 @@ rule one_agent_per_trip:
         population=lambda wildcards: get_simulation_input_file("population.xml.gz", wildcards.scenario),
     output:
         "%s/routing/inputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
-    threads: 4
+    threads: 1
     resources:
-        mem_mb=4096 + java_memory_offset
+        mem_mb=memory_string_to_mb(config_object.resources.population_splitting_memory)+ java_memory_offset
     params:
-        java_cmd=config_object.java.java_cmd
+        java_cmd=config_object.java.java_cmd,
+        memory_str=config_object.resources.population_splitting_memory
     shell:
         '''
         mkdir -p "$(dirname {output[0]})"
-        {params.java_cmd} -Xmx4G -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
+        {params.java_cmd} -Xmx{params.memory_str} -cp {input.jar} org.eqasim.papers.gpe2025.utils.OneAgentPerTrip \
         --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
@@ -283,45 +292,95 @@ rule adapt_config:
         "%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path
     params:
         java_cmd=java_cmd,
+        memory_str=memory_str
+    threads: 1
+    resources:
+        mem_mb=memory_mb + java_memory_offset
     shell:
         '''
-        {params.java_cmd} -cp {input.jar} org.eqasim.core.simulation.modes.transit_with_abstract_access.utils.AdaptConfigForTransitWithAbstractAccess \
+        {params.java_cmd} -Xmx{params.memory_str} -cp {input.jar} org.eqasim.core.simulation.modes.transit_with_abstract_access.utils.AdaptConfigForTransitWithAbstractAccess \
         --accesses-file-path={input.abstract_access_items} \
         --mode-name=transitWithAbstractAccess --input-config-path={input.config} --output-config-path={output[0]}
         '''
 
 
-def get_feeder_routed_outputs(scenarios=None):
-    if scenarios is None:
-        scenarios = [s for s in  config_object.scenarios.values() if s.feeders is not None]
-    l = [expand("%s/routing/outputs/simulated_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}" % (config_object.output_path, s.scenario_name),
-        radius=s.feeders.radiis,
-        frequency=s.feeders.frequencies,
-        speed_index=list(range(len(s.feeders.speeds))))  for s in scenarios]
-    return flatten(l)
 
-def get_feeder_mode_choice_outputs(scenarios=None):
+def get_non_feeder_related_outputs(output_type, scenarios=None):
+    if scenarios is None:
+        scenarios  = [s for s in  config_object.scenarios.values() if s.feeders is None]
+    else:
+        if not isinstance(scenarios, list):
+            scenarios = [scenarios]
+        for s in scenarios:
+            if s.feeders is not None:
+                raise Exception("Scenario %s has feeder services configured" % s.scenario_name)
+    if output_type == "mode_choice":
+        l = ["%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name) for s in scenarios]
+    elif output_type == "routing":
+        l = ["%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, s.scenario_name) for s in scenarios]
+    else:
+        raise Exception("Unsupported output type %s" % output_type)
+    return l
+
+
+'''
+The method below retrieves the routing or mode choice outputs for one or more feeder scenarios
+@:param output_type: either 'routing' or 'mode_choice' depending on the output desired
+@:param scenarios: The scenarios for which the outputs are desired. If None, will retrieve the outputs of all feeder scenarios
+@:param radiis: if not None, specifies a set of radius values for which the outputs are desired (has to be a subset of the values specified in the scenario)
+@:param frequencies: if not None, specifies a set of frequency values for which the outputs are desired (has to be a subset of the values specified in the scenario)
+@:param speeds: if not None, specifies a set of speed values for which the outputs are desired (has to be a subset of the values specified in the scenario)
+'''
+def get_feeder_related_outputs(output_type, scenarios=None, radiis=None, frequencies=None, speeds=None):
     if scenarios is None:
         scenarios = [s for s in  config_object.scenarios.values() if s.feeders is not None]
-    l = [expand("%s/mode_choice/outputs_simulated/%s_{radius}_{frequency}_{speed_index}" % (config_object.output_path, s.scenario_name),
-        radius=s.feeders.radiis,
-        frequency=s.feeders.frequencies,
-        speed_index=list(range(len(s.feeders.speeds))))  for s in scenarios]
-    return flatten(l)
+    else :
+        if not isinstance(scenarios, list):
+            scenarios = [scenarios]
+        for s in scenarios:
+            if s.feeders is None:
+                raise Exception("Scenario %s has no feeder services configured" % s.scenario_name)
+
+    if radiis is not None and not isinstance(radiis, list):
+        radiis = [radiis]
+    if frequencies is not None and not isinstance(frequencies, list):
+        frequencies = [frequencies]
+    if speeds is not None and not isinstance(speeds, list):
+        speeds = [speeds]
+    if output_type == "routing":
+        base_path = "%s/routing/outputs/simulated_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}"
+    elif output_type == "mode_choice":
+        base_path = "%s/mode_choice/outputs_simulated/%s_{radius}_{frequency}_{speed_index}"
+    else:
+        raise Exception("Unkown output_type %s" % output_type)
+
+    l = [expand(base_path % (config_object.output_path, s.scenario_name),
+        radius=[radius for radius in s.feeders.radiis if radius in (radiis if radiis is not None else s.feeders.radiis)],
+        frequency=[frequency for frequency in s.feeders.frequencies if frequency in (frequencies if frequencies is not None else s.feeders.frequencies)],
+        speed_index=[i for i in range(len(s.feeders.speeds)) if s.feeders.speeds[i] in (speeds if speeds is not None else s.feeders.speeds)])  for s in scenarios]
+
+    l = flatten(l)
+    if len(l) == 1:
+        l = l[0]
+    return l
+
 
 rule routing_feeder_analysis:
     input:
-        feeder_outputs=lambda wildcards: get_feeder_routed_outputs([config_object.scenarios[wildcards.scenario]]),
-        no_feeder_outputs=lambda wildcards: "%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+        feeder_outputs=lambda wildcards: get_feeder_related_outputs("routing", config_object.scenarios[wildcards.scenario]),
+        no_feeder_outputs= lambda wildcards: get_non_feeder_related_outputs("routing", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
     params:
         config = config,
         pipeline_kwargs = dict(basedir=workflow.basedir, max_cores=workflow.cores),
         # Multiple Named input parameters that are lists get converted into one list losing the names
         # So I have to put them again as parameters here
-        feeder_outputs = lambda wildcards: get_feeder_routed_outputs([config_object.scenarios[wildcards.scenario]]),
-        no_feeder_outputs = lambda wildcards: "%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else None
+        feeder_outputs = lambda wildcards: get_feeder_related_outputs("routing", config_object.scenarios[wildcards.scenario]),
+        no_feeder_outputs = lambda wildcards: get_non_feeder_related_outputs("routing", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
     output:
         "%s/routing/feeder_analyses/{scenario}.ipynb" % config_object.output_path
+    threads: 1
+    resources:
+        mem_mb=analysis_memory_mb
     log:
         notebook="%s/routing/feeder_analyses/{scenario}.ipynb" % config_object.output_path
     notebook:
@@ -329,16 +388,72 @@ rule routing_feeder_analysis:
 
 rule mode_choice_feeder_analysis:
     input:
-        feeder_outputs=lambda wildcards: get_feeder_mode_choice_outputs([config_object.scenarios[wildcards.scenario]]),
-        no_feeder_outputs=lambda wildcards: "%s/mode_choice/outputs/outputs_simulated/%s" % (config_object.output_path, config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+        feeder_outputs=lambda wildcards: get_feeder_related_outputs("mode_choice", [config_object.scenarios[wildcards.scenario]]),
+        no_feeder_outputs=lambda wildcards: get_non_feeder_related_outputs("mode_choice", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
     output:
-        "%s/mode_choice/analysis_{analysis}" % config_object.output_path
+        "%s/mode_choice/feeder_analyses/{scenario}.ipynb" % config_object.output_path
+    threads: 1
+    resources:
+        mem_mb=analysis_memory_mb
+    shell: # Just a mock for now before we initialize the notebook
+        '''
+        touch {output[0]}
+        '''
+
+
+def get_analysis_inputs(analysis):
+    outputs = {label: ("%s/routing/outputs/simulated_%s_pt" if analysis.type == "routing" else "%s/mode_choice/outputs_simulated/%s") % (config_object.output_path, item[0].scenario_name) for label, item in analysis.scenario_items.items() if item[2] is None}
+    outputs.update({label: get_feeder_related_outputs(analysis.type, scenarios=item[0], radiis=item[2]["radius"], frequencies=item[2]["frequency"], speeds=item[2]["speed"]) for label, item in analysis.scenario_items.items() if item[2] is not None})
+    return outputs
+
+for analysis in config_object.analyses.values():
+    rule:
+        name: "analysis_%s" % analysis.analysis_name
+        input:
+            **get_analysis_inputs(analysis) # For some reason snakemake converts this into a list so I have to also pass it as a parameter to have the labels too
+        params:
+            config = config,
+            pipeline_kwargs = dict(basedir=workflow.basedir, max_cores=workflow.cores),
+            analysis_name = analysis.analysis_name,
+            scenarios = dict(**get_analysis_inputs(analysis)),
+            reference = analysis.reference
+        threads: 1
+        resources:
+            mem_mb=analysis_memory_mb
+        output:
+            "%s/%s/scenario_comparisons/%s.ipynb" % (config_object.output_path, analysis.type, analysis.analysis_name)
+        log:
+            notebook="%s/%s/scenario_comparisons/%s.ipynb" % (config_object.output_path, analysis.type, analysis.analysis_name)
+        notebook: "../notebooks/%s_scenario_analysis.ipynb" % analysis.type
+
+
+def get_all_outputs():
+    outputs = set()
+
+    # We check if all non feeder scenarios are to be considered
+    if config_object.run_non_feeders != "requiredOnly":
+        if config_object.run_non_feeders != "all":
+            methods = [config_object.run_non_feeders]
+        else:
+            methods = ["mode_choice", "routing"]
+        for method in methods:
+            outputs = outputs.union(get_non_feeder_related_outputs(method))
+
+    # Next we check feeder scenarios
+    if config_object.run_feeders != "requiredOnly":
+        scenarios = [s for s in config_object.scenarios.values() if s.feeders is not None]
+        if config_object.run_feeders in ["all", "mode_choice"]:
+            outputs = outputs.union(["%s/mode_choice/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in scenarios])
+        if config_object.run_feeders in ["all", "routing"]:
+            outputs = outputs.union(["%s/routing/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in scenarios])
+
+    # Now we check the analyses
+    for analysis in config_object.analyses.values():
+        outputs.add("%s/%s/scenario_comparisons/%s.ipynb" % (config_object.output_path, analysis.type, analysis.analysis_name))
+
+    return outputs
 
 rule all:
     default_target: True
     input:
-        get_feeder_routed_outputs(),
-        get_feeder_mode_choice_outputs(),
-        [["%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, s.scenario_name),
-          "%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name)] for s in config_object.scenarios.values() if s.feeders is None],
-        ["%s/routing/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in config_object.scenarios.values() if s.feeders is not None]
+        get_all_outputs()

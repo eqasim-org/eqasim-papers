@@ -1,9 +1,15 @@
-java:
+
+java: # Java and Maven command lines
   java_cmd: "java"
   mvn_cmd: "mvn"
 resources:
+  # RunPopulationRouting and RunStandaloneModeChoice will be executed with the maximum number of threads
+  # Regular simulations will not use more than 12 threads
+  # And analyses will use up to 4 threads
   max-threads: 4
   memory: "10G"
+  population_splitting_memory: "4G"
+  analysis_memory: "10G"
 scenarios:
   nofeeder:
     path: "../test_data"
@@ -18,13 +24,34 @@ scenarios:
       no_feeder_counterpart: "nofeeder" # We use this for the analysis, this scenario will be loaded as the feeder with 0 feeder radius
 
 output_path: "../outputs"
-# Work in progress below
+
+run_feeders: "all"
+run_non_feeders: "all"
+
+# Below can specify the list of analyses we want to run
 analyses:
-  base_gpe_impact:
-    type: routing
+  # This analysis example compares the routing results of specified scenarios previously defined above
+  # For scenarios that do not contain a feeder specification, we just need their names
+  # For other that have feeder services configured in their defintions, we need to specify the particular feeder setting by specifying its parameters
+  feeder_imapct:
+    type: "routing"
+    reference_scenario_label: "nofeeder"
     scenarios:
+      # This level contains the ids of the scenarios as they will be considered during the analysis
+      # We need Ids different than than the scenario names because scenarios with feeders can be mentioned more than once with different feeder configurations
       nofeeder:
-      feeder:
+        scenario_name: "nofeeder"
+        label: "Baseline"
+      wide_area:
+        scenario_name: "feeder"
+        label: "Wide area feeder"
+        feeder_setting: # The parameter values must be contained within the values specified in the scenario definition
+          radius: 400
+          speed: 4.16
+          frequency: 300
+      small_area:
+        scenario_name: "feeder"
+        label: "Small area feeder"
         feeder_setting:
           radius: 200
           speed: 4.16

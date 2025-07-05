@@ -16,7 +16,11 @@ class ResourcesConfig:
     def __init__(self, config_dict, max_cores):
         self.max_threads = min(max_cores, int(config_dict["max-threads"]))
         self.memory = config_dict["memory"]
-        assert isinstance(self.memory, str) and ( self.memory.endswith("G") or self.memory.endswith("M"))
+        self.population_splitting_memory = config_dict["population_splitting_memory"]
+        self.analysis_memory = config_dict["analysis_memory"]
+        for s in [self.memory, self.population_splitting_memory, self.analysis_memory]:
+            assert isinstance(s, str) and ( s.endswith("G") or s.endswith("M"))
+
 
 
 class FeedersConfig:
@@ -45,20 +49,30 @@ class AnalysisConfig:
     def __init__(self, analysis_name, config_dict, scenarios):
         self.analysis_name = analysis_name
         self.type = config_dict["type"]
-        self.scenarios = dict()
-        for s, dict_s in config_dict["scenarios"].items():
+        self.reference = config_dict["reference_scenario_label"]
+        self.scenario_items = dict()
+        labels = set()
+        for scenario_id, dict_s in config_dict["scenarios"].items():
+            s = dict_s["scenario_name"]
             if not s in scenarios:
                 raise Exception("Scenario %s mentioned by analysis %s not found" % (s, analysis_name))
             scenario_config = scenarios[s]
-            feeder_config = None
-            if dict_s is not None:
+            if "feeder_setting" in dict_s:
+                feeder_setting = dict(**dict_s["feeder_setting"])
                 feeders_config = scenario_config.feeders
-                assert dict_s["feeder_setting"]["radius"] in feeders_config.radiis
-                assert dict_s["feeder_setting"]["speed"] in feeders_config.speeds
-                assert dict_s["feeder_setting"]["frequency"] in feeders_config.frequencies
+                assert feeder_setting["radius"] in feeders_config.radiis
+                assert feeder_setting["speed"] in feeders_config.speeds
+                assert feeder_setting["frequency"] in feeders_config.frequencies
             else:
                 assert scenario_config.feeders is None
-            self.scenarios[s] = feeder_config
+                feeder_setting = None
+            label = dict_s["label"]
+            if label in labels:
+                raise Exception("Label %s already exists" % labels)
+            else:
+                labels.add(label)
+            self.scenario_items[scenario_id] = (scenario_config, label, feeder_setting)
+        assert self.reference in self.scenario_items
 
 
 class PipelineConfig:
@@ -67,6 +81,20 @@ class PipelineConfig:
         self.java = JavaConfig(config_dict["java"])
         self.resources = ResourcesConfig(config_dict["resources"], max_cores)
         self.scenarios = dict()
+
+        self.run_feeders = "requiredOnly"
+        self.run_non_feeders = "requiredOnly"
+
+        if "run_feeders" in config_dict:
+            if config_dict["run_feeders"] not in ["requiredOnly", "mode_choice", "routing", "all"]:
+                raise Exception("run_feeders must be one of : requiredOnly, mode_choice, routing, and all")
+            self.run_feeders = config_dict["run_feeders"]
+
+        if "run_non_feeders" in config_dict:
+            if config_dict["run_non_feeders"] not in ["requiredOnly", "mopde_choice", "routing", "all"]:
+                raise Exception("run_non_feeders must be one of : requiredOnly, mode_choice, routing, and all")
+            self.run_non_feeders = config_dict["run_non_feeders"]
+
         for s in config_dict["scenarios"]:
             self.scenarios[s] = ScenarioConfig(s, config_dict["scenarios"][s], basedir)
 
