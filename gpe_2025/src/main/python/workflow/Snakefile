@@ -116,8 +116,6 @@ for scenario in config_object.scenarios.values():
 
 # This rule compiles the current maven module into a standalone jar
 
-print(pom_path)
-
 rule compile:
     input:
         java_sources_paths,
@@ -165,7 +163,8 @@ rule run_population_routing:
         "%s/routing/outputs/split_population_{scenario}_{mode}.xml.gz" % config_object.output_path
     params:
         memory_str=config_object.resources.memory,
-        java_cmd=config_object.java.java_cmd
+        java_cmd=config_object.java.java_cmd,
+        extra_args=""
     threads: config_object.resources.max_threads
     resources:
         mem_mb=memory_mb + java_memory_offset
@@ -174,7 +173,7 @@ rule run_population_routing:
         mkdir -p "$(dirname {output[0]})"
         {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
-        --threads={threads}
+        --threads={threads} {params.extra_args}
         '''
 
 # The following rule is an override of the previous one focusing on routing trips in a specific feeder setting
@@ -219,7 +218,7 @@ use rule simulation as post_routing_simulation with:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}" % config_object.output_path)
 
 
-
+# This rule does the same thing as the one above but for feeder scenarios
 use rule post_routing_simulation as post_routing_simulation_with_feeders with:
     input:
         jar=jar_path,
@@ -228,7 +227,7 @@ use rule post_routing_simulation as post_routing_simulation_with_feeders with:
     output:
         output_path=directory("%s/routing/outputs/simulated_{scenario}_{mode}_{radius}_{frequency}_{speed_index}" % config_object.output_path)
 
-
+# This rule provides the generic functionality of running the standalone mode choice
 rule mode_choice:
     input:
         jar=jar_path,
@@ -250,6 +249,7 @@ rule mode_choice:
         --config:standaloneModeChoice.removePersonsWithNoValidAlternatives=true --config:global.numberOfThreads={threads} {params.extra_args}
         '''
 
+# Runs the standalone mode choice for a scenario without feeder services
 use rule mode_choice as regular_mode_choice with:
     input:
         jar=jar_path,
@@ -257,6 +257,7 @@ use rule mode_choice as regular_mode_choice with:
     output:
         output_path=directory("%s/mode_choice/outputs/{scenario}" % config_object.output_path)
 
+# Runs the standalone mode choice for a scenario with feeder services
 use rule mode_choice as feeder_mode_choice with:
     input:
         jar=jar_path,
@@ -264,6 +265,7 @@ use rule mode_choice as feeder_mode_choice with:
     output:
         output_path=directory("%s/mode_choice/outputs/{scenario}_{radius}_{frequency}_{speed_index}" % config_object.output_path)
 
+# Performs the simulation following a standalone mode choice run of a scenario (with or without feeders)
 use rule simulation as post_mode_choice_simulation with:
     input:
         jar=jar_path,
@@ -326,6 +328,8 @@ def get_non_feeder_related_outputs(output_type, scenarios=None):
         l = ["%s/mode_choice/outputs_simulated/%s" % (config_object.output_path, s.scenario_name) for s in scenarios]
     elif output_type == "routing":
         l = ["%s/routing/outputs/simulated_%s_pt" % (config_object.output_path, s.scenario_name) for s in scenarios]
+    elif output_type == "simulation":
+        l = ["%s/simulations/outputs/%s" % (config_object.output_path, s.scenario_name) for s in scenarios]
     else:
         raise Exception("Unsupported output type %s" % output_type)
     return l
@@ -359,6 +363,8 @@ def get_feeder_related_outputs(output_type, scenarios=None, radiis=None, frequen
         base_path = "%s/routing/outputs/simulated_%s_transitWithAbstractAccess_{radius}_{frequency}_{speed_index}"
     elif output_type == "mode_choice":
         base_path = "%s/mode_choice/outputs_simulated/%s_{radius}_{frequency}_{speed_index}"
+    elif output_type == "simulation":
+        base_path = "%s/simulations/outputs/%s_{radius}_{frequency}_{speed_index}"
     else:
         raise Exception("Unkown output_type %s" % output_type)
 
@@ -373,6 +379,7 @@ def get_feeder_related_outputs(output_type, scenarios=None, radiis=None, frequen
     return l
 
 
+# This rule performs the sensitivity analysis for feeder services on a single scenario based on routing results
 rule routing_feeder_analysis:
     input:
         feeder_outputs=lambda wildcards: get_feeder_related_outputs("routing", config_object.scenarios[wildcards.scenario]),
@@ -394,6 +401,7 @@ rule routing_feeder_analysis:
     notebook:
         "../notebooks/routing_feeder_analysis.ipynb"
 
+# This rule performs the sensitivity analysis for feeder services on a single scenario based on mode choice results
 rule mode_choice_feeder_analysis:
     input:
         feeder_outputs=lambda wildcards: get_feeder_related_outputs("mode_choice", [config_object.scenarios[wildcards.scenario]]),
@@ -408,12 +416,53 @@ rule mode_choice_feeder_analysis:
         touch {output[0]}
         '''
 
+# Regular simulation related rules
+use rule run_population_routing as full_pt_rerouting with:
+    input:
+        jar = jar_path,
+        config = lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        plans = lambda wildcards: get_simulation_input_file("population.xml.gz", wildcards.scenario)
+    params:
+        extra_args = "--modes=pt"
+    output:
+        "%s/simulations/prerouting/{scenario}.xml.gz" % config_object.output_path
 
+
+# This rule is a generic one that allows to perform simulations
+use rule simulation as regular_simulation with:
+    input:
+        jar=jar_path,
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario),
+        plans="%s/simulations/prerouting/{scenario}.xml.gz" % config_object.output_path
+    params:
+        extra_args = lambda wildcards: "--config:plans.inputPlansFile=%s/simulations/prerouting/%s.xml.gz" % (config_object.output_path, wildcards.scenario),
+        memory_str=config_object.resources.memory,
+        java_cmd=config_object.java.java_cmd
+    output:
+        output_path="%s/simulations/outputs/{scenario}" % config_object.output_path
+
+# Runs the standalone mode choice for a scenario with feeder services
+use rule simulation as regular_feeder_simulation with:
+    input:
+        jar=jar_path,
+        config="%s/cache/inputs/{scenario}/config_abstract_access_{radius}_{frequency}_{speed_index}.xml" % config_object.output_path,
+        plans="%s/simulations/prerouting/{scenario}.xml.gz" % config_object.output_path
+    params:
+        extra_args = lambda wildcards: "--config:plans.inputPlansFile=%s/simulations/prerouting/%s.xml.gz" % (config_object.output_path, wildcards.scenario),
+        memory_str=config_object.resources.memory,
+        java_cmd=config_object.java.java_cmd
+    output:
+        output_path=directory("%s/simulations/outputs/{scenario}_{radius}_{frequency}_{speed_index}" % config_object.output_path)
+
+# This method is in charge of retrieving the inputs required for running analyses
+# These inputs are the outputs of running a routing or a mode choice
 def get_analysis_inputs(analysis):
     outputs = {label: ("%s/routing/outputs/simulated_%s_pt" if analysis.type == "routing" else "%s/mode_choice/outputs_simulated/%s") % (config_object.output_path, item[0].scenario_name) for label, item in analysis.scenario_items.items() if item[2] is None}
     outputs.update({label: get_feeder_related_outputs(analysis.type, scenarios=item[0], radiis=item[2]["radius"], frequencies=item[2]["frequency"], speeds=item[2]["speed"]) for label, item in analysis.scenario_items.items() if item[2] is not None})
     return outputs
 
+# Here we programmatically create the rules in charge of performing the analyses specified in the config file
+# These analyses simply compare between multiple scenario outputs (either from routing or mode choice)
 for analysis in config_object.analyses.values():
     rule:
         name: "analysis_%s" % analysis.analysis_name
@@ -454,6 +503,9 @@ def get_all_outputs():
             outputs = outputs.union(["%s/mode_choice/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in scenarios])
         if config_object.run_feeders in ["all", "routing"]:
             outputs = outputs.union(["%s/routing/feeder_analyses/%s.ipynb" % (config_object.output_path, s.scenario_name) for s in scenarios])
+
+    # outputs = outputs.union(get_non_feeder_related_outputs("simulation"))
+    # outputs = outputs.union(get_feeder_related_outputs("simulation"))
 
     # Now we check the analyses
     for analysis in config_object.analyses.values():
