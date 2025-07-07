@@ -14,7 +14,6 @@ import org.matsim.contribs.discrete_mode_choice.model.mode_availability.ModeAvai
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.controler.events.ShutdownEvent;
 import org.matsim.core.controler.listener.ControlerListener;
 import org.matsim.core.controler.listener.ShutdownListener;
 
@@ -37,7 +36,7 @@ public class CustomConfigurator extends IDFConfigurator {
         registerModule(new AbstractModule() {
             @Override
             public void install() {
-                addControlerListenerBinding().toProvider(new Provider<ControlerListener>() {
+                addControlerListenerBinding().toProvider(new Provider<>() {
 
                     @Inject
                     private OutputDirectoryHierarchy outputDirectoryHierarchy;
@@ -77,8 +76,5 @@ public class CustomConfigurator extends IDFConfigurator {
         if(lastPersonEndTime.isPresent()) {
             scenario.getConfig().qsim().setEndTime(Math.max(scenario.getConfig().qsim().getEndTime().orElse(-1), lastPersonEndTime.getAsDouble() + OFFSET));
         }
-
-        //C:\Users\tarek.chouaki\repos\github\eqasim-org\eqasim-papers\gpe_2025\test_data\input\test_data\output\routed_population.xml
-        //C:\Users\tarek.chouaki\repos\github\eqasim-org\eqasim-papers\gpe_2025\test_data\output\routed_population.xml
     }
 }
