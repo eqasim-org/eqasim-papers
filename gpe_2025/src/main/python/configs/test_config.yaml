@@ -12,10 +12,10 @@ resources:
   analysis_memory: "10G"
 scenarios:
   nofeeder:
-    path: "../test_data"
+    path: "../../resources/test_data"
     prefix: "reduced_"
   feeder:
-    path: "../test_data"
+    path: "../../resources/test_data"
     prefix: "reduced_"
     feeders:
       radiis: [ 200, 400 ] # The possible values for the feeder radius in meters

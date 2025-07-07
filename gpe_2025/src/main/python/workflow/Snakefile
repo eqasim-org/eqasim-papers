@@ -44,10 +44,13 @@ config_object = PipelineConfig(config, workflow.basedir, workflow.cores)
 
 
 # Maven and Java related variables
-mvn_project_base_path = to_absolute("../../../../", workflow.basedir)
+mvn_project_base_path = to_absolute("../../../../../", workflow.basedir)
+
 pom_path = os.path.join(mvn_project_base_path, "pom.xml")
 mvn_repository_path = to_absolute(".m2", workflow.basedir)
-java_sources_base_path = to_absolute("../java", workflow.basedir)
+
+java_sources_base_path = to_absolute("../../java", workflow.basedir)
+
 java_sources_paths = [to_absolute(f, workflow.basedir) for f in
                       glob.iglob(java_sources_base_path + "**/**",recursive=True) if os.path.isfile(f)]
 
@@ -83,19 +86,21 @@ wildcard_constraints:
     mode="[a-zA-Z]+",
     remaining="(_.+){0,1}"
 
+
 # We need to create the input copying rules in a procedural way because we need the scenario prefix in the output path
 for scenario in config_object.scenarios.values():
+    contents = list(os.listdir(scenario.path))
+    if len(contents) == 0:
+        raise Exception("Folder indicated for scenario %s is empty" % scenario.scenario_name)
     rule:
         name:
             f"copy_{scenario.scenario_name}_inputs"
         input:
-            scenario.path
+            ["%s/%s" % (scenario.path, c) for c in contents]
         output:
-            # We mention as outputs of this rules the files that are explicitly referenced by other rules
-            # But still we copy all the directory content
-            "%s/cache/inputs/%s/%sconfig.xml" % (config_object.output_path, scenario.scenario_name, scenario.prefix),
-            "%s/cache/inputs/%s/%spopulation.xml.gz" % (config_object.output_path, scenario.scenario_name, scenario.prefix)
+            ["%s/cache/inputs/%s/%s" % (config_object.output_path, scenario.scenario_name, c) for c in contents]
         params:
+            inputs_location = scenario.path,
             outputs_location = lambda wildcards, output: os.path.dirname(output[0])
         threads: 1
         resources:
@@ -106,10 +111,13 @@ for scenario in config_object.scenarios.values():
             echo "Creating folder {params.outputs_location}"
             mkdir -p {params.outputs_location}
             echo "Copying files into {params.outputs_location}"
-            cp {input[0]}/* {params.outputs_location}/
+            cp {params.inputs_location}/* {params.outputs_location}/
             '''
 
 # This rule compiles the current maven module into a standalone jar
+
+print(pom_path)
+
 rule compile:
     input:
         java_sources_paths,
@@ -122,7 +130,7 @@ rule compile:
     resources:
         mem_mb=4096
     shell:
-        '{params.mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}"'
+        '{params.mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{mvn_repository_path}" -DskipTests'
 
 
 # The following rules are related to the evaluation of quality of PT trips between the control and the GPE scenarios
