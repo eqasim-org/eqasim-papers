@@ -34,7 +34,7 @@ analyses:
   # For scenarios that do not contain a feeder specification, we just need their names
   # For other that have feeder services configured in their defintions, we need to specify the particular feeder setting by specifying its parameters
   feeder_imapct:
-    type: "routing"
+    type: "routing" # Later we will have the ability to run analyses based on the running the mode choice
     reference_scenario_label: "nofeeder"
     scenarios:
       # This level contains the ids of the scenarios as they will be considered during the analysis
