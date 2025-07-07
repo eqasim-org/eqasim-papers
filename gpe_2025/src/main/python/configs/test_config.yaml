@@ -25,8 +25,8 @@ scenarios:
 
 output_path: "../outputs"
 
-run_feeders: "all"
-run_non_feeders: "all"
+run_feeders: "all" # One of requiredOnly, mode_choice, routing, and all
+run_non_feeders: "all" # One of requiredOnly, mode_choice, routing, and all
 
 # Below can specify the list of analyses we want to run
 analyses:
@@ -38,10 +38,10 @@ analyses:
     reference_scenario_label: "nofeeder"
     scenarios:
       # This level contains the ids of the scenarios as they will be considered during the analysis
-      # We need Ids different than than the scenario names because scenarios with feeders can be mentioned more than once with different feeder configurations
+      # We need Ids different than the scenario names because scenarios with feeders can be mentioned more than once with different feeder configurations
       nofeeder:
         scenario_name: "nofeeder"
-        label: "Baseline"
+        label: "Baseline" # These are the labels that will be put in the plots
       wide_area:
         scenario_name: "feeder"
         label: "Wide area feeder"
