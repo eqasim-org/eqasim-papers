@@ -28,6 +28,7 @@ class FeedersConfig:
         for l in [config_dict["radiis"], config_dict["speeds"], config_dict["frequencies"]]:
             assert isinstance(l, list) and len(l) > 0
 
+        self.centers = config_dict["centers"]
         self.radiis = [int(r) for r in config_dict["radiis"]]
         self.speeds = [float(s) for s in config_dict["speeds"]]
         self.frequencies = [int(r) for r in config_dict["frequencies"]]

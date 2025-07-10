@@ -77,8 +77,11 @@ analysis_memory_mb = memory_string_to_mb(config_object.resources.analysis_memory
 
 java_memory_offset = 10240
 
-def get_simulation_input_file(input_file, scenario, **kwargs):
-    return os.path.join(config_object.output_path, "cache/inputs/%s" % scenario, config_object.scenarios[scenario].prefix + input_file)
+def get_simulation_input_file(input_file, scenario, apply_prefix=True, **kwargs):
+    if apply_prefix:
+        return os.path.join(config_object.output_path, "cache/inputs/%s" % scenario, config_object.scenarios[scenario].prefix + input_file)
+    else:
+        return os.path.join(config_object.output_path, "cache/inputs/%s" % scenario, input_file)
 
 
 wildcard_constraints:
@@ -278,6 +281,8 @@ use rule simulation as post_mode_choice_simulation with:
 
 # Creates abstract accesses items files
 rule create_abstract_accesses:
+    input:
+        lambda wildcards: get_simulation_input_file(config_object.scenarios[wildcards.scenario].feeders.centers, wildcards.scenario, apply_prefix=False)
     params:
         radius=lambda wildcards: wildcards.radius,
         speed=lambda wildcards: config_object.scenarios[wildcards.scenario].feeders.speeds[int(wildcards.speed_index)],

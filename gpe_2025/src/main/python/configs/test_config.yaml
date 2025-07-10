@@ -18,6 +18,7 @@ scenarios:
     path: "../../resources/test_data"
     prefix: "reduced_"
     feeders:
+      centers: "reduced_feeder_centers.txt"
       radiis: [ 200, 400 ] # The possible values for the feeder radius in meters
       speeds: [ 4.16 ] # The possible speeds for the feeder services in m/s
       frequencies: [ 300 ] # The possible frequencies in seconds

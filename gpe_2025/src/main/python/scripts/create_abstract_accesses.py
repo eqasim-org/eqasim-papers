@@ -47,13 +47,20 @@ transit_stop_ids = {
 #    "IDFM:monomodalStopPlace:59342.link:pt_IDFM:monomodalStopPlace:59342" : "Aulnay Val Francilia",
 }
 
-generate_access_xml(
-    transit_stop_ids=transit_stop_ids.keys(),
-    radius=snakemake.params.radius,
-    average_speed=snakemake.params.speed,
-    using_routed_distance=snakemake.params.using_routed_distance,
-    access_type=snakemake.params.access_type,
-    frequency=snakemake.params.frequency,
-    output_path=snakemake.output[0]
+if __name__ == "__main__":
+
+    centers_path = snakemake.input[0]
+
+    with open(centers_path, "r") as f:
+        transit_stop_ids = f.readlines()
+
+    generate_access_xml(
+        transit_stop_ids=transit_stop_ids,
+        radius=snakemake.params.radius,
+        average_speed=snakemake.params.speed,
+        using_routed_distance=snakemake.params.using_routed_distance,
+        access_type=snakemake.params.access_type,
+        frequency=snakemake.params.frequency,
+        output_path=snakemake.output[0]
 )
     
