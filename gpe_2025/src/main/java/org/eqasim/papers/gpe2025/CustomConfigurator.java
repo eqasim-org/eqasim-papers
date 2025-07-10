@@ -1,5 +1,6 @@
 package org.eqasim.papers.gpe2025;
 
+import ch.sbb.matsim.routing.pt.raptor.RaptorParametersForPerson;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import org.eqasim.core.simulation.modes.transit_with_abstract_access.mode_choice.TransitWithAbstractAccessModeAvailabilityWrapper;
@@ -44,11 +45,14 @@ public class CustomConfigurator extends IDFConfigurator {
                     @Inject
                     private Population population;
 
+                    @Inject
+                    private RaptorParametersForPerson raptorParametersForPerson;
+
                     @Override
                     public ControlerListener get() {
                         return (ShutdownListener) _ -> {
                             try {
-                                ExtractPtRoutingCosts.extract(population, outputDirectoryHierarchy.getOutputFilename("pt_routing_costs.csv"));
+                                ExtractPtRoutingCosts.extract(raptorParametersForPerson, population, outputDirectoryHierarchy.getOutputFilename("pt_routing_costs.csv"));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
