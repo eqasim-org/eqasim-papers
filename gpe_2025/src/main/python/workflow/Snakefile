@@ -409,17 +409,24 @@ rule routing_feeder_analysis:
 # This rule performs the sensitivity analysis for feeder services on a single scenario based on mode choice results
 rule mode_choice_feeder_analysis:
     input:
-        feeder_outputs=lambda wildcards: get_feeder_related_outputs("mode_choice", [config_object.scenarios[wildcards.scenario]]),
-        no_feeder_outputs=lambda wildcards: get_non_feeder_related_outputs("mode_choice", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+        feeder_outputs=lambda wildcards: get_feeder_related_outputs("mode_choice", config_object.scenarios[wildcards.scenario]),
+        no_feeder_outputs= lambda wildcards: get_non_feeder_related_outputs("mode_choice", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
+    params:
+        config = config,
+        pipeline_kwargs = dict(basedir=workflow.basedir, max_cores=workflow.cores),
+        # Multiple Named input parameters that are lists get converted into one list losing the names
+        # So I have to put them again as parameters here
+        feeder_outputs = lambda wildcards: get_feeder_related_outputs("mode_choice", config_object.scenarios[wildcards.scenario]),
+        no_feeder_outputs = lambda wildcards: get_non_feeder_related_outputs("mode_choice", config_object.scenarios[config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart]) if config_object.scenarios[wildcards.scenario].feeders.no_feeder_counterpart is not None else []
     output:
         "%s/mode_choice/feeder_analyses/{scenario}.ipynb" % config_object.output_path
     threads: 1
     resources:
         mem_mb=analysis_memory_mb
-    shell: # Just a mock for now before we initialize the notebook
-        '''
-        touch {output[0]}
-        '''
+    log:
+        notebook="%s/mode_choice/feeder_analyses/{scenario}.ipynb" % config_object.output_path
+    notebook:
+        "../notebooks/mode_choice_feeder_analysis.ipynb"
 
 # Regular simulation related rules
 use rule run_population_routing as full_pt_rerouting with:
