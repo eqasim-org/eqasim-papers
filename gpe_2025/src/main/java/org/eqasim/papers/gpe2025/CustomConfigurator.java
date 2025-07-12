@@ -45,14 +45,11 @@ public class CustomConfigurator extends IDFConfigurator {
                     @Inject
                     private Population population;
 
-                    @Inject
-                    private RaptorParametersForPerson raptorParametersForPerson;
-
                     @Override
                     public ControlerListener get() {
                         return (ShutdownListener) _ -> {
                             try {
-                                ExtractPtRoutingCosts.extract(raptorParametersForPerson, population, outputDirectoryHierarchy.getOutputFilename("pt_routing_costs.csv"));
+                                ExtractPtRoutingCosts.extract(population, outputDirectoryHierarchy.getOutputFilename("pt_routing_costs.csv"));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
