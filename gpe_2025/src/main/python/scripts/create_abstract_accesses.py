@@ -52,7 +52,7 @@ if __name__ == "__main__":
     centers_path = snakemake.input[0]
 
     with open(centers_path, "r") as f:
-        transit_stop_ids = f.readlines()
+        transit_stop_ids = [s for s in f.read().splitlines() if len(s) > 0]
 
     generate_access_xml(
         transit_stop_ids=transit_stop_ids,
