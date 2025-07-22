@@ -176,7 +176,7 @@ rule run_population_routing:
         mkdir -p "$(dirname {output[0]})"
         {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
-        --threads={threads} {params.extra_args}
+        --threads={threads} {params.extra_args} --config:controller.outputDirectory=$TMPDIR/temp_outputs
         '''
 
 # The following rule is an override of the previous one focusing on routing trips in a specific feeder setting
@@ -272,7 +272,7 @@ use rule mode_choice as feeder_mode_choice with:
 use rule simulation as post_mode_choice_simulation with:
     input:
         jar=jar_path,
-        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario) if len(wildcards.remaining) == 0 else get_simulation_input_file("config_abstract_access_%s.xml" % wildcards.remaining, wildcards.scenario, apply_prefix=False),
+        config=lambda wildcards: get_simulation_input_file("config.xml", wildcards.scenario) if len(wildcards.remaining) == 0 else get_simulation_input_file("config_abstract_access%s.xml" % wildcards.remaining, wildcards.scenario, apply_prefix=False),
         mode_choice_outputs="%s/mode_choice/outputs/{scenario}{remaining}" % config_object.output_path
     output:
         output_path=directory("%s/mode_choice/outputs_simulated/{scenario}{remaining}" % config_object.output_path)
