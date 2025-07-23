@@ -155,6 +155,19 @@ rule one_agent_per_trip:
         --input-path={input.population} --override-mode={wildcards.mode} --output-path={output[0]}
         '''
 
+
+class Counter:
+
+    def __init__(self):
+        self._index = 0
+    def get(self):
+        self._index += 1
+        return self._index
+
+
+counter = Counter()
+
+
 # The rule below performs the population routing.
 # The base version of this rule takes the initial configuration of the scenario as well as the split plans
 rule run_population_routing:
@@ -167,6 +180,7 @@ rule run_population_routing:
     params:
         memory_str=config_object.resources.memory,
         java_cmd=config_object.java.java_cmd,
+        unique_id=counter.get(),
         extra_args=""
     threads: config_object.resources.max_threads
     resources:
@@ -176,7 +190,7 @@ rule run_population_routing:
         mkdir -p "$(dirname {output[0]})"
         {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path={input.config} --output-path={output[0]} --config:plans.inputPlansFile={input.plans} \
-        --threads={threads} {params.extra_args} --config:controller.outputDirectory=$TMPDIR/temp_outputs
+        --threads={threads} {params.extra_args} --config:controller.outputDirectory=$TMPDIR/routing_{params.unique_id}
         '''
 
 # The following rule is an override of the previous one focusing on routing trips in a specific feeder setting
