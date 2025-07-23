@@ -89,6 +89,10 @@ wildcard_constraints:
     mode="[a-zA-Z]+",
     remaining="(_.+){0,1}"
 
+def get_unique_job_id(wildcards, input):
+    s = str(wildcards) + str(input)
+    return hash(s)
+
 
 # We need to create the input copying rules in a procedural way because we need the scenario prefix in the output path
 for scenario in config_object.scenarios.values():
@@ -156,18 +160,6 @@ rule one_agent_per_trip:
         '''
 
 
-class Counter:
-
-    def __init__(self):
-        self._index = 0
-    def get(self):
-        self._index += 1
-        return self._index
-
-
-counter = Counter()
-
-
 # The rule below performs the population routing.
 # The base version of this rule takes the initial configuration of the scenario as well as the split plans
 rule run_population_routing:
@@ -180,7 +172,7 @@ rule run_population_routing:
     params:
         memory_str=config_object.resources.memory,
         java_cmd=config_object.java.java_cmd,
-        unique_id=counter.get(),
+        unique_id=lambda wildcards, input: get_unique_job_id(wildcards, input),
         extra_args=""
     threads: config_object.resources.max_threads
     resources:
