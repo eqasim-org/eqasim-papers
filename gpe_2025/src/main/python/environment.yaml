@@ -1,0 +1,12 @@
+name: gpe_2025
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - snakemake
+  - plotly
+  - jupyter
+  - pandas
+  - openjdk=22
+  - maven
