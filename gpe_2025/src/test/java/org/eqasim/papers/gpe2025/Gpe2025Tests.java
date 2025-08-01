@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
 
 import org.eqasim.core.scenario.routing.RunPopulationRouting;
 import org.eqasim.core.simulation.modes.transit_with_abstract_access.utils.AdaptConfigForTransitWithAbstractAccess;
@@ -26,12 +27,12 @@ public class Gpe2025Tests {
 
     @After
     public void tearDown() throws IOException {
-        //FileUtils.deleteDirectory(new File("test_data"));
+        FileUtils.deleteDirectory(new File("test_data"));
     }
 
 
     @Test
-    public void runTest() throws CommandLine.ConfigurationException, InterruptedException, IOException {
+    public void runTest() throws CommandLine.ConfigurationException, InterruptedException, IOException, ExecutionException {
         String basePath = "test_data";
         String prefix = "reduced_";
 
