@@ -119,7 +119,11 @@ for scenario in config_object.scenarios.values():
             mkdir -p {params.outputs_location}
             cp {params.inputs_location}/* {params.outputs_location}/
             java -cp {params.jar_path} org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon \
+            --config:DiscreteModeChoice.modelType=EfficientTour \
             --input-config-path={params.inputs_location}/{params.prefix}config.xml --output-config-path={params.outputs_location}/{params.prefix}config.xml
+            java -cp {params.jar_path} org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF \
+            --input-config-path={params.outputs_location}/{params.prefix}config.xml --engine=true \
+            --output-config-path={params.outputs_location}/{params.prefix}config.xml
             '''
 
 # This rule compiles the current maven module into a standalone jar
