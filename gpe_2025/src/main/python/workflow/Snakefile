@@ -1,8 +1,6 @@
 import os
 import glob
 import collections.abc
-import pickle
-import json
 import sys
 import importlib.util
 
@@ -94,6 +92,8 @@ def get_unique_job_id(wildcards, input):
     return hash(s)
 
 
+# The following set of rules are in charge of copying simulation inputs to the cache folder
+# The rules also modify the base config files to make sure they use pseudo random errors
 # We need to create the input copying rules in a procedural way because we need the scenario prefix in the output path
 for scenario in config_object.scenarios.values():
     contents = list(os.listdir(scenario.path))
@@ -103,22 +103,23 @@ for scenario in config_object.scenarios.values():
         name:
             f"copy_{scenario.scenario_name}_inputs"
         input:
-            ["%s/%s" % (scenario.path, c) for c in contents]
+            ["%s/%s" % (scenario.path, c) for c in contents] + [jar_path]
         output:
             ["%s/cache/inputs/%s/%s" % (config_object.output_path, scenario.scenario_name, c) for c in contents]
         params:
             inputs_location = scenario.path,
-            outputs_location = lambda wildcards, output: os.path.dirname(output[0])
+            outputs_location = lambda wildcards, output: os.path.dirname(output[0]),
+            prefix = scenario.prefix,
+            jar_path = jar_path
         threads: 1
         resources:
             mem_mb=1024
         shell:
             '''
-            pwd
-            echo "Creating folder {params.outputs_location}"
             mkdir -p {params.outputs_location}
-            echo "Copying files into {params.outputs_location}"
             cp {params.inputs_location}/* {params.outputs_location}/
+            java -cp {params.jar_path} org.eqasim.core.simulation.mode_choice.epsilon.AdaptConfigForEpsilon \
+            --input-config-path={params.inputs_location}/{params.prefix}config.xml --output-config-path={params.outputs_location}/{params.prefix}config.xml
             '''
 
 # This rule compiles the current maven module into a standalone jar
