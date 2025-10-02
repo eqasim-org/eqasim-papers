@@ -1,5 +1,6 @@
 import os
 
+
 def to_absolute(in_path, ref_path):
     if in_path is None:
         return None
@@ -107,3 +108,5 @@ class PipelineConfig:
         if "analyses" in config_dict:
             for a in config_dict["analyses"]:
                 self.analyses[a] = AnalysisConfig(a, config_dict["analyses"][a], self.scenarios)
+
+
