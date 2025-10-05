@@ -7,7 +7,6 @@ import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
 import org.matsim.core.router.TripStructureUtils;
-import org.matsim.pt.routes.DefaultTransitPassengerRoute;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -17,7 +16,7 @@ import java.util.List;
 
 public class ExtractPtRoutingCosts {
 
-    public static void extract(Population population, String outputPath) throws IOException {
+    public static void extract(Population population, String outputPath, RaptorParametersForPerson raptorParametersForPerson) throws IOException {
         Writer fileWriter = new BufferedWriter(new FileWriter(outputPath));
         fileWriter.write("person_id;trip_id;mode;routingCost\n");
 
@@ -31,29 +30,29 @@ public class ExtractPtRoutingCosts {
                 String routingMode = null;
                 boolean skipTrip = false;
 
-                for(Leg leg: trip.getLegsOnly()) {
-                    routingMode = leg.getRoutingMode();
-                    if(!routingMode.equals("pt") && !routingMode.equals("transitWithAbstractAccess")) {
-                        skipTrip = true;
-                        break;
-                    }
-                    if(leg.getMode().equals("pt")) {
-                        if(leg.getRoute() instanceof DefaultTransitPassengerRoute defaultTransitPassengerRoute) {
-                            routingCost += defaultTransitPassengerRoute.totalPtRoutingCost;
-                        } else {
-                            throw new IllegalStateException("Exptected DefaultTransitPassengerRoute in pt leg");
-                        }
-                    } else if(leg.getMode().equals(TransitWithAbstractAccessRoutingModule.ABSTRACT_ACCESS_LEG_MODE_NAME)) {
-                        if(leg.getRoute() instanceof DefaultAbstractAccessRoute defaultAbstractAccessRoute) {
-                            routingCost = defaultAbstractAccessRoute.getTotalRoutingCost();
-                            if(Double.isNaN(routingCost)) {
-                                throw new IllegalStateException("Unexpected NaN value");
+                if (trip.getLegsOnly().getFirst().getRoutingMode().equals("pt")) {
+                   routingCost = TransitWithAbstractAccessRoutingModule.calcPtRoutingCost(trip.getTripElements(), trip.getOriginActivity().getCoord(), trip.getDestinationActivity().getCoord(), person, raptorParametersForPerson);
+                } else if(trip.getLegsOnly().getFirst().getRoutingMode().equals("transitWithAbstractAccess")) {
+                    boolean foundLeg = false;
+                    for(Leg leg: trip.getLegsOnly()) {
+                        if(leg.getMode().equals(TransitWithAbstractAccessRoutingModule.ABSTRACT_ACCESS_LEG_MODE_NAME)) {
+                            if(leg.getRoute() instanceof DefaultAbstractAccessRoute defaultAbstractAccessRoute) {
+                                routingCost = defaultAbstractAccessRoute.getTotalRoutingCost();
+                                foundLeg = true;
+                                if(Double.isNaN(routingCost)) {
+                                    throw new IllegalStateException("Unexpected NaN value");
+                                }
+                                break;
+                            } else {
+                                throw new IllegalStateException(String.format("Unexpected DefaultAbstractAccessRoute in %s leg",  leg.getMode()));
                             }
-                            break;
-                        } else {
-                            throw new IllegalStateException(String.format("Unexpected DefaultAbstractAccessRoute in %s leg",  leg.getMode()));
                         }
                     }
+                    if(!foundLeg) {
+                        throw new IllegalStateException("Could not find leg with mode " + TransitWithAbstractAccessRoutingModule.ABSTRACT_ACCESS_LEG_MODE_NAME);
+                    }
+                } else {
+                    skipTrip = true;
                 }
 
                 if(!skipTrip) {
