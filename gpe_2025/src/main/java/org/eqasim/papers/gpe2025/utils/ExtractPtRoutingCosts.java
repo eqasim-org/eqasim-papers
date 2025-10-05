@@ -27,12 +27,13 @@ public class ExtractPtRoutingCosts {
 
                 double routingCost = 0;
 
-                String routingMode = null;
                 boolean skipTrip = false;
 
-                if (trip.getLegsOnly().getFirst().getRoutingMode().equals("pt")) {
+                String routingMode = trip.getLegsOnly().getFirst().getRoutingMode();
+
+                if (routingMode.equals("pt") || (routingMode.equals("transitWithAbstractAccess") && trip.getLegsOnly().stream().map(Leg::getMode).noneMatch(TransitWithAbstractAccessRoutingModule.ABSTRACT_ACCESS_LEG_MODE_NAME::equals)) ) {
                    routingCost = TransitWithAbstractAccessRoutingModule.calcPtRoutingCost(trip.getTripElements(), trip.getOriginActivity().getCoord(), trip.getDestinationActivity().getCoord(), person, raptorParametersForPerson);
-                } else if(trip.getLegsOnly().getFirst().getRoutingMode().equals("transitWithAbstractAccess")) {
+                } else if(routingMode.equals("transitWithAbstractAccess")) {
                     boolean foundLeg = false;
                     for(Leg leg: trip.getLegsOnly()) {
                         if(leg.getMode().equals(TransitWithAbstractAccessRoutingModule.ABSTRACT_ACCESS_LEG_MODE_NAME)) {
