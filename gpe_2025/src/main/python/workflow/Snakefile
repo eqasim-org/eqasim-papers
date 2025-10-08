@@ -203,7 +203,7 @@ use rule run_population_routing as run_population_routing_with_feeders with:
 rule simulation:
     input:
         jar=jar_path,
-        config=""
+        config="placeholderSimulationConfigInput"
     params:
         extra_args = "",
         memory_str=config_object.resources.memory,
@@ -212,7 +212,7 @@ rule simulation:
     resources:
         mem_mb=memory_mb + java_memory_offset
     output:
-        output_path=""
+        output_path="placeholderSimulationOutputPathOutput"
     shell:
         '''
         {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.papers.gpe2025.RunSimulation \
@@ -245,7 +245,7 @@ use rule post_routing_simulation as post_routing_simulation_with_feeders with:
 rule mode_choice:
     input:
         jar=jar_path,
-        config=""
+        config="placeholderModeChoiceConfigInput"
     params:
         extra_args="",
         memory_str=config_object.resources.memory,
@@ -255,7 +255,7 @@ rule mode_choice:
     resources:
         mem_mb=memory_mb + java_memory_offset
     output:
-        output_path=""
+        output_path="placholderModeChoiceOutputPathOutput"
     shell:
         '''
         {params.java_cmd} -Xmx{params.memory_str} -XX:MaxRAMPercentage=100.0 -cp {input.jar} org.eqasim.core.standalone_mode_choice.RunStandaloneModeChoice \
