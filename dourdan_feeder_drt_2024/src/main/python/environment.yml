@@ -1,6 +1,7 @@
 name: dourdan20
 channels:
   - conda-forge
+  - bioconda
 dependencies:
   - snakemake
   - maven
