@@ -1,25 +1,87 @@
-temp_path: "temp"
-output_path: "outputs"
-local_maven_repo: ".m2/repository"
-java_cmd: "java"
-mvn_cmd: "mvn"
+java: # Java and Maven command lines
+  java_cmd: "java"
+  mvn_cmd: "mvn"
+  local_maven_repo: ".m2/repository"
 
-simulation_inputs:
-  path: "simulation_inputs"
-  prefix: "ile_de_france_"
+resources:
+  global_simulations:
+    threads: 10
+    memory: "50G"
+  area_simulations:
+    threads: 10
+    memory: "5G"
 
-sub_area:
+general_inputs:
+  input_path: "inputs/simulation_inputs"
+  input_prefix: "ile_de_france_"
   area_prefix: "drn_"
-  area_path: "drn.shp"
+  area_path: "inputs/drn20.gpkg"
 
-global_simulations:
-  threads: 10
-  memory: "50G"
+modified_transit_schedules:
+  tsb:
+    criteria: "passengers/hour"
+    transit_modes: ["bus"]
+    scope: "all_day"
+    threshold: 50
+  tsc:
+    criteria: "passengers/hour"
+    scope: "off_peak"
+    transit_modes: ["bus"]
+    threshold: 50
 
-area_simulations:
-  threads: 10
-  memory: "5G"
+service_parameters:
+  demand_impacting:
+    operational_scheme: ["stop_based", "door_to_door"]
+    price: ["0.3", "0.6", "0.9"]
+    detour_factor: ["+50%", "+1200s"]
+  non_demand_impacting:
+    vehicle_capacity: [4, 8]
+    prebooking:
+      separate_per_service: true
+      values: [0, 10]
 
-service:
-  demand_identification_fleet_size: 40
-  fleet_sizing: [10, 20, 30, 50]
+
+services:
+  all_day_unimodal:
+    type: "unimodal"
+    availability: "all_day"
+  all_day_intermodal:
+    type: "intermodal"
+    availability: "all_day"
+    transfer_locations:
+      transit_modes: ["rail"]
+  off_peak_unimodal:
+    type: "unimodal"
+    availability: "off_peak"
+
+
+deployment_scenarios:
+  group1:
+    services: ["all_day_unimodal"]
+  group2:
+    services: ["all_day_intermodal"]
+  group3:
+    services: ["all_day_unimodal", "all_day_unimodal"]
+  group4:
+    services: ["off_peak_unimodal", "all_day_intermodal"]
+  group5:
+    services: ["all_day_unimodal", "all_day_unimodal"]
+    simulation_overrides:
+      transit_schedule: "tsb"
+  group6:
+    services: ["all_day_unimodal", "all_day_unimodal"]
+    simulation_overrides:
+      transit_schedule: "tsc"
+  group7:
+    services: ["off_peak_unimodal", "all_day_intermodal"]
+    simulation_overrides:
+      transit_schedule: "tsc"
+
+fleet_sizing:
+  demand_identification_fleet_size: 30
+  fleet_sizes: [10, 20, 30, 50]
+  max_rejection_rate: "0.05"
+
+output_path: "output"
+temp_path: "temp"
+random_seed: 1234
