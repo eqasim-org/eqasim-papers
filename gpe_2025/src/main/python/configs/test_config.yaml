@@ -24,6 +24,7 @@ scenarios:
       frequencies: [ 300 ] # The possible frequencies in seconds
       no_feeder_counterpart: "nofeeder" # We use this for the analysis, this scenario will be loaded as the feeder with 0 feeder radius
 
+sampling: 0.01 # Specifies the sampling of the input synthetic population, used in the analyses to properly scale the quantities. If not specified, a value of 1 is considered.
 output_path: "../outputs"
 
 run_feeders: "all" # One of requiredOnly, mode_choice, routing, and all
@@ -33,8 +34,8 @@ run_non_feeders: "all" # One of requiredOnly, mode_choice, routing, and all
 analyses:
   # This analysis example compares the routing results of specified scenarios previously defined above
   # For scenarios that do not contain a feeder specification, we just need their names
-  # For other that have feeder services configured in their defintions, we need to specify the particular feeder setting by specifying its parameters
-  feeder_imapct:
+  # For others that have feeder services configured in their definition, we need to specify the particular feeder setting by specifying its parameters
+  feeder_impact:
     type: "routing" # Later we will have the ability to run analyses based on the running the mode choice
     reference_scenario_label: "nofeeder"
     scenarios:

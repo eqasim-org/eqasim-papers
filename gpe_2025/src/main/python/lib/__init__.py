@@ -1,5 +1,7 @@
 import os
 
+from pandas.core.sample import sample
+
 
 def to_absolute(in_path, ref_path):
     if in_path is None:
@@ -87,6 +89,8 @@ class PipelineConfig:
         self.run_feeders = "requiredOnly"
         self.run_non_feeders = "requiredOnly"
 
+        self.sampling = 1
+
         if "run_feeders" in config_dict:
             if config_dict["run_feeders"] not in ["requiredOnly", "mode_choice", "routing", "all"]:
                 raise Exception("run_feeders must be one of : requiredOnly, mode_choice, routing, and all")
@@ -109,4 +113,5 @@ class PipelineConfig:
             for a in config_dict["analyses"]:
                 self.analyses[a] = AnalysisConfig(a, config_dict["analyses"][a], self.scenarios)
 
-
+        if "sampling" in config_dict:
+            self.sampling = float(config_dict["sampling"])
