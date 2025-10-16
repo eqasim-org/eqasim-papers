@@ -1,0 +1,8 @@
+name: dourdan20
+channels:
+  - conda-forge
+dependencies:
+  - snakemake
+  - maven
+  - openjdk=22
+  - pip
