@@ -61,7 +61,7 @@ class ServiceParameter:
             for v in set(self.values):
                 assert isinstance(v, str) and v.startswith("+") and v[-1] in ["%", "s"]
                 float(v[1:-1])
-        elif self.name in ["vehicle_capacity", "prebooking"]:
+        elif self.name in ["vehicle_capacity", "prebooking", "max_wait_time"]:
             [int(v) for v in self.values]
         else:
             raise Exception("Unsupported service parameter: %s" % self.name)
@@ -205,3 +205,9 @@ class PipelineConfig:
     def area_vehicles_file_path(self, fleet_size: int, vehicle_capacity: int):
         file_name = "%d_%d.xml" % (fleet_size, vehicle_capacity)
         return os.path.join(self.area_vehicles_files_location, file_name)
+
+class SimulationConfig:
+    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
+        self.deployment_scenario = deployment_scenario
+        self.services_parameters_config = service_parameters_config
+        self.services_parameters_values = service_parameters_values

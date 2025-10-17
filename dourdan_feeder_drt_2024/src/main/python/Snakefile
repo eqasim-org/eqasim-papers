@@ -38,13 +38,10 @@ mvn_cmd = config_object.java.mvn_cmd
 
 original_simulation_files_paths = [os.path.join(config_object.general_inputs_config.input_path, f) for f in os.listdir(config_object.general_inputs_config.input_path)]
 
-prefix = config_object.general_inputs_config.input_prefix
 # The locations of the files that input files after they will be copied
-simulation_inputs_location = config_object.global_simulation_inputs_location
-simulation_files_paths = [os.path.join(simulation_inputs_location, f) for f in os.listdir(config_object.general_inputs_config.input_path)]
+simulation_files_paths = [os.path.join(config_object.global_simulation_inputs_location, f) for f in os.listdir(config_object.general_inputs_config.input_path)]
 # The name of the base config file (in the original location as well as in the copied one)
-input_config_file_name = "%sconfig.xml" % prefix
-input_config_path = os.path.join(simulation_inputs_location, input_config_file_name)
+input_config_file_name = "%sconfig.xml" % config_object.general_inputs_config.input_prefix
 
 rule copy_sim_files:
     input:
@@ -80,6 +77,7 @@ rule compile:
     shell:
         '{mvn_cmd} package -Pstandalone --also-make --file "{pom_path}" -Dmaven.repo.local="{config_object.java.mvn_local_repo}"'
 
+# This rule is to make sure that we properly configure the global simulation before running it
 rule baseline_config:
     input:
         jar_path,
@@ -105,6 +103,7 @@ baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_t
 baseline_plans_path = config_object.global_simulation_output_file_path("output_plans.xml.gz")
 baseline_events_path = config_object.global_simulation_output_file_path("output_events.xml.gz")
 baseline_travel_times_path = config_object.global_simulation_output_file_path("vdf_travel_times.bin")
+
 
 rule global_simulation_baseline:
     input:
@@ -179,15 +178,16 @@ rule drt_vehicles:
         jar_path,
         cut_network_path
     output:
-        "%s/{fleetSize}_4.xml" % config_object.area_vehicles_files_location
+        "%s/{fleetSize}_{vehicleCapacity}.xml" % config_object.area_vehicles_files_location
     shell:
         '''
         mkdir -p {drt_vehicles_location}
-        {java_cmd} -cp {jar_path} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
-        --network-path={cut_network_path} \
+        {java_cmd} -cp {input[0]} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
+        --network-path={input[1]} \
         --vehicles-number={wildcards.fleetSize} \
+        --vehicles-capacity={wildcards.vehicleCapacity} \
         --network-modes=inside_car \
-        --output-vehicles-path={drt_vehicles_location}/drt_vehicles_{wildcards.fleetSize}.xml
+        --output-vehicles-path={output[0]}
         '''
 
 
