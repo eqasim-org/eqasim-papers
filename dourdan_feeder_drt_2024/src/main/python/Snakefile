@@ -95,8 +95,7 @@ rule baseline_config:
         --input-config-path="{output[0]}" \
         --output-config-path="{output[0]}" --engine=true \
         --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 \
-        --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100 \
-        --config:global.numberOfThreads={config_object.global_simulation_resources.threads}
+        --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100
         """
 
 baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv")
@@ -120,7 +119,8 @@ rule global_simulation_baseline:
         '''
         {java_cmd} -cp "{jar_path}" -Xmx{config_object.global_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
         org.eqasim.ile_de_france.RunSimulation --config-path="{input[0]}" \
-        --config:controller.outputDirectory={config_object.global_simulation_outputs_location}
+        --config:controller.outputDirectory={config_object.global_simulation_outputs_location} \
+        --config:global.numberOfThreads={threads}
         '''
 
 
