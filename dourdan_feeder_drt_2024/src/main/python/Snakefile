@@ -53,7 +53,7 @@ rule copy_sim_files:
         mem_mb=2048
     shell:
         """
-        cp {config_object.general_inputs_config.input_path}/* {simulation_inputs_location}
+        cp {config_object.general_inputs_config.input_path}/* {config_object.global_simulation_inputs_location,}
         """
 
 # Maven and Java related variables
