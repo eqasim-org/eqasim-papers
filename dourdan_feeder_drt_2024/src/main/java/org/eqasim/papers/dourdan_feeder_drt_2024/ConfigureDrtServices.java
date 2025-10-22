@@ -1,11 +1,13 @@
 package org.eqasim.papers.dourdan_feeder_drt_2024;
 
+import org.eqasim.core.components.config.EqasimConfigGroup;
 import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstraintConfigGroup;
 import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstraintSingleLegConfigGroup;
 import org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt;
 import org.eqasim.core.simulation.modes.feeder_drt.utils.AdaptConfigForFeederDrt;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.config.Config;
+import org.matsim.core.config.ConfigGroup;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.utils.collections.Tuple;
 
@@ -44,9 +46,9 @@ public class ConfigureDrtServices {
                 .allowOptions("intermodal-availability", "intermodal-transfer-location-modes", "intermodal-transfer-location-ids")
                 .allowOptions().build();
 
-        Configurator configurator = new Configurator();
-        Config config = ConfigUtils.loadConfig(commandLine.getOptionStrict("input-path"), configurator.getConfigGroups());
-        configurator.addOptionalConfigGroups(config);
+        Configurator configurator = new Configurator(commandLine);
+        Config config = ConfigUtils.loadConfig(commandLine.getOptionStrict("input-path"), new ConfigGroup[0]);
+        configurator.updateConfig(config);
 
         Optional<String> unimodalAvailability = commandLine.getOption("unimodal-availability");
         Optional<String> intermodalAvailability = commandLine.getOption("intermodal-availability");
@@ -60,7 +62,8 @@ public class ConfigureDrtServices {
             throw new IllegalStateException("One of intermodal-transfer-location-modes and intermodal-transfer-location-ids must be specified for the intermodal service");
         }
 
-        AdaptConfigForDrt.adapt(config, Map.of("drt", "drt_vehicles.xml"), Map.of("drt", "door2door"), new HashMap<>(), new HashMap<>(), new HashMap<>(), "30:00:00", null);
+        AdaptConfigForDrt.adapt(config, Map.of("drt", "drt_vehicles.xml"), Map.of("drt", "door2door"), new HashMap<>(), new HashMap<>(), new HashMap<>(), "30:00:00", unimodalAvailability.isPresent());
+
 
         if(OFF_PEAK_AVAIlABILITY.equals(unimodalAvailability.orElse("null"))) {
             addOffPeakLegTimeConstraint(config, "drt");
@@ -70,7 +73,7 @@ public class ConfigureDrtServices {
             AdaptConfigForFeederDrt.adapt(config, Map.of("feeder_drt", "pt"), Map.of("feeder_drt", "drt"), new HashMap<>(),
                     intermodalTransferLocationModes.map(s -> Map.of("feeder_drt", s)).orElse(new HashMap<>()),
                     intermodalTransferLocationIds.map(s -> Map.of("feeder_drt", s)).orElse(new HashMap<>()),
-                    null);
+                    true);
 
             if(OFF_PEAK_AVAIlABILITY.equals(intermodalAvailability.get())) {
                 addOffPeakLegTimeConstraint(config, "feeder_drt");

@@ -6,6 +6,7 @@ import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaAnalysis;
 import org.matsim.api.core.v01.population.Population;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.listener.ControlerListener;
+import org.matsim.core.controler.listener.ControllerListener;
 
 public class AgentsAnalysisModule extends AbstractModule {
 
@@ -17,7 +18,7 @@ public class AgentsAnalysisModule extends AbstractModule {
 
     @Override
     public void install() {
-        addControlerListenerBinding().toProvider(new Provider<ControlerListener>() {
+        addControllerListenerBinding().toProvider(new Provider<ControllerListener>() {
 
             @Inject
             private Population population;
@@ -26,7 +27,7 @@ public class AgentsAnalysisModule extends AbstractModule {
             private CbaAnalysis cbaAnalysis;
 
             @Override
-            public ControlerListener get() {
+            public ControllerListener get() {
                 AgentsAnalyzer agentsAnalyzer = new AgentsAnalyzer(configGroup, population);
                 cbaAnalysis.addPermanentAnalyzer(agentsAnalyzer);
                 return agentsAnalyzer;

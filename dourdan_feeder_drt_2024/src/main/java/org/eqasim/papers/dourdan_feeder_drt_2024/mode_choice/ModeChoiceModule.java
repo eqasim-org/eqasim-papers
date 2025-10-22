@@ -5,8 +5,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.inject.Provides;
 import org.eqasim.core.components.config.EqasimConfigGroup;
 import org.eqasim.core.simulation.mode_choice.ParameterDefinition;
-import org.eqasim.core.simulation.modes.drt.mode_choice.DrtModeAvailabilityWrapper;
-import org.eqasim.core.simulation.modes.feeder_drt.mode_choice.FeederDrtModeAvailabilityWrapper;
 import org.eqasim.ile_de_france.mode_choice.IDFModeAvailability;
 import org.eqasim.ile_de_france.mode_choice.IDFModeChoiceModule;
 import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.costs.FeederDrtCostModel;
@@ -35,20 +33,7 @@ public class ModeChoiceModule extends IDFModeChoiceModule {
     protected void installEqasimExtension() {
         super.installEqasimExtension();
 
-        bindModeAvailability(SINGLE_USAGE_FLEETS_MODE_AVAILABILITY).to(FeederDrtModeAvailabilityWrapper.class);
-        bindModeAvailability(DUAL_USAGE_FLEETS_MODE_AVAILABILITY).to(DrtModeAvailabilityWrapper.class);
         bindCostModel(FEEDER_DRT_COST_MODEL).to(FeederDrtCostModel.class);
-    }
-
-
-    @Provides
-    public FeederDrtModeAvailabilityWrapper provideFeederDrtModeAvailabilityWrapper(Config config) {
-        return new FeederDrtModeAvailabilityWrapper(config, new IDFModeAvailability());
-    }
-
-    @Provides
-    public DrtModeAvailabilityWrapper provideDrtModeAvailabilityWrapper(Config config) {
-        return new DrtModeAvailabilityWrapper(config, new FeederDrtModeAvailabilityWrapper(config, new IDFModeAvailability()));
     }
 
     @Provides

@@ -57,7 +57,7 @@ public class DrtAnalysisModule extends AbstractDvrpModeModule {
                 DrtConfigGroup.OperationalScheme scheme = DrtConfigGroup.OperationalScheme.stopbased;
                 for(DrtConfigGroup drtConfigGroup : multiModeDrtConfigGroup.getModalElements()) {
                     if(drtConfigGroup.getMode().equals(this.getMode())) {
-                        scheme = drtConfigGroup.operationalScheme;
+                        scheme = drtConfigGroup.getOperationalScheme();
                     }
                 }
                 return scheme;
