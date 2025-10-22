@@ -129,6 +129,8 @@ class DeploymentScenario:
     def __init__(self, name, config_dict, services, modified_transit_schedules):
         self.name = name
         self.services = {s: services[s] for s in config_dict["services"]}
+        assert len(self.services) <= 2
+        assert len(set(s.type for s in self.services.values())) == len(self.services)
         self.simulation_overrides = dict()
         if "simulation_overrides" in config_dict:
             for key, value in config_dict["simulation_overrides"].items():
@@ -205,6 +207,29 @@ class PipelineConfig:
     def area_vehicles_file_path(self, fleet_size: int, vehicle_capacity: int):
         file_name = "%d_%d.xml" % (fleet_size, vehicle_capacity)
         return os.path.join(self.area_vehicles_files_location, file_name)
+
+    def get_modified_transit_schedule_path(self, modified_transit_schedule):
+        if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
+            modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
+        return os.path.join(self.output_path, "modified_transit_schedules", "%s.xml.gz" % modified_transit_schedule.name)
+
+    def get_deployment_scenario_configure_args(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        result = ""
+        for service in deployment_scenario.services.values():
+            if service.type == ServiceType.UNIMODAL:
+                result += "--unimodal-availability %s" % service.availability
+            else:
+                result += "--intermodal-availability %s" % service.availability
+                transfer_locations_config = service.transfer_locations
+                if len(transfer_locations_config.transit_modes) > 0:
+                    result += "--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes)
+                if len(transfer_locations_config.transit_stops) > 0:
+                    result += "--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops)
+        for key, value in deployment_scenario.simulation_overrides.items():
+            if key == "transit_schedule":
+                result += "--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value)
 
 class SimulationConfig:
     def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):

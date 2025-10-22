@@ -94,8 +94,9 @@ rule baseline_config:
         {java_cmd} -cp "{input[0]}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF \
         --input-config-path="{output[0]}" \
         --output-config-path="{output[0]}" --engine=true \
-        --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 \
-        --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100
+        --config:eqasim:vdf_engine.generateNetworkEvents=true \
+        --config:eqasim:vdf.writeTravelTimesInterval=1 --config:controller.lastIteration=0 \
+        --config:swissRailRaptor.transferCalculation=Adaptive
         """
 
 baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv")
@@ -127,6 +128,7 @@ rule global_simulation_baseline:
 
 cut_config_path = config_object.area_baseline_config_path
 cut_network_path = config_object.area_simulation_input_file_path("network.xml.gz")
+cut_transit_schedule_path = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
 
 rule cutter:
     input:
@@ -138,7 +140,8 @@ rule cutter:
         config_object.general_inputs_config.area_path
     output:
         cut_config_path,
-        cut_network_path
+        cut_network_path,
+        cut_transit_schedule_path
     threads: config_object.global_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory)
@@ -190,6 +193,18 @@ rule drt_vehicles:
         --output-vehicles-path={output[0]}
         '''
 
+
+for modified_transit_schedule in config_object.modified_transit_schedules.values():
+    rule:
+        name: "modified_transit_schedule_%s" % modified_transit_schedule.name
+        input:
+            config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
+        output:
+            config_object.get_modified_transit_schedule_path(modified_transit_schedule)
+        shell:
+            """
+            echo "Hello World"
+            """
 
 rule all:
     default_target: True
