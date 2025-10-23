@@ -173,7 +173,8 @@ rule area_simulation_baseline:
         {java_cmd} -cp {jar_path} org.eqasim.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
         --config-path {cut_config_path} \
         --config:global.numberOfThreads {config_object.area_simulation_resources.threads} \
-        --config:controller.outputDirectory {config_object.area_baseline_simulation_outputs_location}
+        --config:controller.outputDirectory {config_object.area_baseline_simulation_outputs_location} \
+        --config:controller.lastIteration 100
         '''
 
 rule drt_vehicles:
