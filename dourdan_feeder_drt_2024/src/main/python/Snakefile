@@ -152,7 +152,7 @@ rule cutter:
          --events-path={input[3]} \
          --vdf-travel-times-path={input[4]} \
          --extent-path={config_object.general_inputs_config.area_path} \
-         --prefix={config_object.general_inputs_config.input_prefix} \
+         --prefix={config_object.general_inputs_config.area_prefix} \
          --flag-area-link-modes=true  \
          --threads={config_object.global_simulation_resources.threads} \
          --output-path={config_object.area_simulation_inputs_location}
@@ -164,7 +164,7 @@ rule area_simulation_baseline:
         jar_path,
         cut_config_path,
     output:
-        config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv")
+        PipelineConfig.get_relevant_simulation_inputs(config_object.area_baseline_simulation_outputs_location)
     threads: config_object.area_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
@@ -194,11 +194,34 @@ rule drt_vehicles:
         '''
 
 
+rule network_gpkg:
+    input:
+        jar_path=jar_path,
+        schedule_path=config_object.area_simulation_input_file_path("transit_schedule.xml.gz"),
+        network_path=config_object.area_simulation_input_file_path("network.xml.gz")
+    params:
+        crs="EPSG:2154"
+    output:
+        "%s/misc/network.gpkg" % config_object.output_path
+    shell:
+        """
+        {java_cmd} -cp {input.jar_path} org.eqasim.core.tools.ExportTransitLinesToGeopackage \
+        --schedule-path {input.schedule_path} --network-path {input.network_path} \
+        --crs {params.crs} --output-path={output[0]}
+        """
+
 for modified_transit_schedule in config_object.modified_transit_schedules.values():
     rule:
         name: "modified_transit_schedule_%s" % modified_transit_schedule.name
         input:
-            config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
+            schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
+            legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
+            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv")
+        params:
+            criteria = modified_transit_schedule.criteria,
+            scope = modified_transit_schedule.scope,
+            threshold = modified_transit_schedule.threshold,
+            transit_modes = modified_transit_schedule.transit_modes
         output:
             config_object.get_modified_transit_schedule_path(modified_transit_schedule)
         shell:
@@ -211,3 +234,4 @@ rule all:
     input:
         baseline_trips_path,
         config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv"),
+        [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()]

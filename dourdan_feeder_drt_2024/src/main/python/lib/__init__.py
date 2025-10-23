@@ -148,6 +148,10 @@ class GeneralInputsConfig:
         assert self.area_prefix != "global_"
 
 class PipelineConfig:
+
+    RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
+                                   "output_plans.xml.gz"]
+
     def __init__(self, config_dict, basedir, max_cores):
         self.output_path = to_absolute(config_dict["output_path"], basedir)
         self.temp_path = to_absolute(config_dict["temp_path"], basedir)
@@ -163,6 +167,10 @@ class PipelineConfig:
         self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"])
         self.deployment_scenarios = {key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in config_dict["deployment_scenarios"].items()}
 
+
+    @staticmethod
+    def get_relevant_simulation_inputs(base_path):
+        return [os.path.join(base_path, f) for f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
 
     @property
     def global_simulation_inputs_location(self):
