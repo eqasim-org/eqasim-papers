@@ -1,5 +1,6 @@
 import os
-
+import hashlib
+import itertools
 
 def to_absolute(in_path, ref_path):
     if in_path is None:
@@ -130,7 +131,7 @@ class DeploymentScenario:
         self.name = name
         self.services = {s: services[s] for s in config_dict["services"]}
         assert len(self.services) <= 2
-        assert len(set(s.type for s in self.services.values())) == len(self.services)
+        assert len(self.service_types) == len(self.services)
         self.simulation_overrides = dict()
         if "simulation_overrides" in config_dict:
             for key, value in config_dict["simulation_overrides"].items():
@@ -139,6 +140,14 @@ class DeploymentScenario:
                 else:
                     raise Exception("Unsupported simulation override: %s" % key)
 
+    @property
+    def transit_schedule_override(self):
+        return self.simulation_overrides["transit_schedule"] if "transit_schedule" in self.simulation_overrides else None
+
+    @property
+    def service_types(self):
+        return set(s.type for s in self.services.values())
+
 class GeneralInputsConfig:
     def __init__(self, config_dict, basedir):
         self.input_path = to_absolute(config_dict["input_path"], basedir)
@@ -146,6 +155,15 @@ class GeneralInputsConfig:
         self.area_path = to_absolute(config_dict["area_path"], basedir)
         self.area_prefix = config_dict["area_prefix"]
         assert self.area_prefix != "global_"
+
+def dctproduct(dct):
+    """
+    >>> list(dctproduct({'number': [1, 2], 'character': 'ab'}))
+    [{'number': 1, 'character': 'a'}, {'number': 1, 'character': 'b'}, {'number': 2, 'character': 'a'}, {'number': 2, 'character': 'b'}]
+    """
+    keys = dct.keys()
+    for vals in itertools.product(*dct.values()):
+        yield dict(zip(keys, vals))
 
 class PipelineConfig:
 
@@ -221,6 +239,11 @@ class PipelineConfig:
             modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
         return os.path.join(self.output_path, "modified_transit_schedules", "%s.xml.gz" % modified_transit_schedule.name)
 
+    def get_deployment_scenario_config_path(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        return self.area_simulation_input_file_path("config_%s.xml" % deployment_scenario.name)
+
     def get_deployment_scenario_configure_args(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
@@ -239,8 +262,26 @@ class PipelineConfig:
             if key == "transit_schedule":
                 result += "--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value)
 
+
+
 class SimulationConfig:
-    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
+    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
         self.deployment_scenario = deployment_scenario
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
+        self.fleet_size = fleet_size
+        self.hash_code = SimulationConfig.hash(self)
+        for key, value in self.services_parameters_values.items():
+            if key == "prebooking":
+                assert isinstance(value, dict)
+            else:
+                assert not isinstance(value, dict)
+
+    @staticmethod
+    def hash(simulation_config):
+        d = dict(**simulation_config.services_parameters_values)
+        assert "deployment_scenario" not in d
+        assert "fleet_size" not in d
+        d["deployment_scenario"] = simulation_config.deployment_scenario.name
+        d["fleet_size"] = simulation_config.fleet_size
+        return str(hashlib.sha256(str(d).encode("utf-8")).hexdigest())

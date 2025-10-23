@@ -170,7 +170,7 @@ rule area_simulation_baseline:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
     shell:
         '''
-        {java_cmd} -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
+        {java_cmd} -cp {jar_path} org.eqasim.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
         --config-path{cut_config_path} \
         --config:global.numberOfThreads={config_object.area_simulation_resources.threads} \
         --config:controller.outputDirectory={config_object.area_baseline_simulation_outputs_location}
@@ -229,9 +229,28 @@ for modified_transit_schedule in config_object.modified_transit_schedules.values
             echo "Hello World"
             """
 
+for deployment_scenario in config_object.deployment_scenarios.values():
+    transit_schedule_override = deployment_scenario.transit_schedule_override
+    rule:
+        name: "deployment_scenario_%s_config" % deployment_scenario.name
+        input:
+            [jar_path, config_object.area_simulation_input_file_path("config.xml")] + ([config_object.get_modified_transit_schedule_path(transit_schedule_override)] if transit_schedule_override is not None else [])
+        output:
+            config_object.get_deployment_scenario_config_path(deployment_scenario)
+        params:
+            args=lambda wildcards: config_object.get_deployment_scenario_configure_args(deployment_scenario)
+        shell:
+            """
+            {java_cmd} -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
+            --input-path {input[1]} --output-path {output[0]} \
+            {params.args}
+            """
+
+
 rule all:
     default_target: True
     input:
         baseline_trips_path,
         config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv"),
-        [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()]
+        [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()],
+        [config_object.get_deployment_scenario_config_path(deployment_scenario) for deployment_scenario in config_object.deployment_scenarios.values()]
