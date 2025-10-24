@@ -250,6 +250,30 @@ class PipelineConfig:
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
         return self.area_simulation_input_file_path("config_%s.xml" % deployment_scenario.name)
 
+    def get_cost_parameters_file_path(self, deployment_scenario, unitary_cost):
+        assert isinstance(unitary_cost, str)
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        return os.path.join(self.area_simulation_inputs_location, "cost_parameters", deployment_scenario.name, "%s.yaml" % unitary_cost)
+
+    def get_cost_params(self, deployment_scenario, unitary_cost):
+        assert isinstance(unitary_cost, str)
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+
+        params = {"drtCost_EUR_access": 0,
+                  "drtCost_EUR_km": 0,
+                  "feederDrtCost_EUR_access": 0,
+                  "feederDrtCost_EUR_km": 0}
+
+        unitary_cost = float(unitary_cost)
+        if "unimodal" in deployment_scenario.service_types:
+            params["drtCost_EUR_access"] = float(unitary_cost)
+            params["drtCost_EUR_km"] = float(unitary_cost)
+        if "intermodal" in deployment_scenario.service_types:
+            params["feederDrtCost_EUR_km"] = float(unitary_cost)
+        return params
+
     def get_deployment_scenario_configure_args(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
@@ -301,6 +325,8 @@ class PipelineConfig:
         simulation_config = self.simulation_configs[hash_code]
         inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
         inputs["vehicles"] = "%s/%d_%d.xml" % (self.area_vehicles_files_location, simulation_config.fleet_size, simulation_config.services_parameters_values["vehicle_capacity"])
+
+        inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
 
         if demand_identification:
             inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
