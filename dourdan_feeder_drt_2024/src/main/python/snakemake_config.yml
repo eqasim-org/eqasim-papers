@@ -25,7 +25,7 @@ modified_transit_schedules:
     threshold: 50
   tsc:
     criteria: "passengers/hour"
-    scope: "off_peak"
+    scope: "peak"
     transit_modes: ["bus"]
     threshold: 50
 
@@ -61,15 +61,15 @@ deployment_scenarios:
   group2:
     services: ["all_day_intermodal"]
   group3:
-    services: ["all_day_unimodal", "all_day_unimodal"]
+    services: ["all_day_unimodal", "all_day_intermodal"]
   group4:
     services: ["off_peak_unimodal", "all_day_intermodal"]
   group5:
-    services: ["all_day_unimodal", "all_day_unimodal"]
+    services: ["all_day_unimodal", "all_day_intermodal"]
     simulation_overrides:
       transit_schedule: "tsb"
   group6:
-    services: ["all_day_unimodal", "all_day_unimodal"]
+    services: ["all_day_unimodal", "all_day_intermodal"]
     simulation_overrides:
       transit_schedule: "tsc"
   group7:
@@ -78,7 +78,7 @@ deployment_scenarios:
       transit_schedule: "tsc"
 
 fleet_sizing:
-  demand_identification_fleet_size: 30
+  demand_identification_fleet_size: 10
   fleet_sizes: [10, 20, 30, 50]
   max_rejection_rate: "0.05"
 
