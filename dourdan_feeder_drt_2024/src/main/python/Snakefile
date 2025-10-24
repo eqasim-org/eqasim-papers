@@ -293,7 +293,8 @@ rule demand_identification_simulation:
     resources:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
     params:
-        output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash)
+        output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
+        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash)
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
@@ -301,7 +302,7 @@ rule demand_identification_simulation:
         --config:multiModeDrt.drt[mode=drt] {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
         --config:controller.outputDirectory {params.output_dir} \
-        --config:eqasim.costParametersPath {input.cost_params} 
+        --config:eqasim.costParametersPath {input.cost_params} {params.args}
         """
 
 

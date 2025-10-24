@@ -336,6 +336,20 @@ class PipelineConfig:
         inputs.update(kwargs)
         return inputs
 
+    def get_simulation_args(self, hash_code):
+        simulation_config = self.simulation_configs[hash_code]
+        args = list()
+        detour_factor = simulation_config.services_parameters_values["detour_factor"]
+        detour_factor_value = float(detour_factor[1:-1])
+        if detour_factor.endswith("%"):
+            detour_factor_value += 100
+            detour_factor_value += 100
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeAlpha %f" % detour_factor_value)
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeBeta %f" % detour_factor_value)
+        else:
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxAbsoluteDetour %f" % detour_factor_value)
+        return args
+
 class SimulationConfig:
     def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
         self.deployment_scenario = deployment_scenario
