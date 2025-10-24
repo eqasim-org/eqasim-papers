@@ -94,8 +94,9 @@ rule baseline_config:
         {java_cmd} -cp "{input[0]}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF \
         --input-config-path="{output[0]}" \
         --output-config-path="{output[0]}" --engine=true \
-        --config:eqasim:vdf_engine.generateNetworkEvents=true --config:eqasim:vdf.writeFlowInterval=10 \
-        --config:eqasim:vdf.writeInterval=10 --config:controller.lastIteration=100
+        --config:eqasim:vdf_engine.generateNetworkEvents=true \
+        --config:eqasim:vdf.writeTravelTimesInterval=1 --config:controller.lastIteration=0 \
+        --config:swissRailRaptor.transferCalculation=Adaptive
         """
 
 baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv")
@@ -127,6 +128,7 @@ rule global_simulation_baseline:
 
 cut_config_path = config_object.area_baseline_config_path
 cut_network_path = config_object.area_simulation_input_file_path("network.xml.gz")
+cut_transit_schedule_path = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
 
 rule cutter:
     input:
@@ -138,7 +140,8 @@ rule cutter:
         config_object.general_inputs_config.area_path
     output:
         cut_config_path,
-        cut_network_path
+        cut_network_path,
+        cut_transit_schedule_path
     threads: config_object.global_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory)
@@ -149,7 +152,7 @@ rule cutter:
          --events-path={input[3]} \
          --vdf-travel-times-path={input[4]} \
          --extent-path={config_object.general_inputs_config.area_path} \
-         --prefix={config_object.general_inputs_config.input_prefix} \
+         --prefix={config_object.general_inputs_config.area_prefix} \
          --flag-area-link-modes=true  \
          --threads={config_object.global_simulation_resources.threads} \
          --output-path={config_object.area_simulation_inputs_location}
@@ -161,16 +164,17 @@ rule area_simulation_baseline:
         jar_path,
         cut_config_path,
     output:
-        config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv")
+        PipelineConfig.get_relevant_simulation_inputs(config_object.area_baseline_simulation_outputs_location)
     threads: config_object.area_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
     shell:
         '''
-        {java_cmd} -cp {jar_path} org.eqasim.core.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
-        --config-path{cut_config_path} \
-        --config:global.numberOfThreads={config_object.area_simulation_resources.threads} \
-        --config:controller.outputDirectory={config_object.area_baseline_simulation_outputs_location}
+        {java_cmd} -cp {jar_path} org.eqasim.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
+        --config-path {cut_config_path} \
+        --config:global.numberOfThreads {config_object.area_simulation_resources.threads} \
+        --config:controller.outputDirectory {config_object.area_baseline_simulation_outputs_location} \
+        --config:controller.lastIteration 100
         '''
 
 rule drt_vehicles:
@@ -181,7 +185,6 @@ rule drt_vehicles:
         "%s/{fleetSize}_{vehicleCapacity}.xml" % config_object.area_vehicles_files_location
     shell:
         '''
-        mkdir -p {drt_vehicles_location}
         {java_cmd} -cp {input[0]} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
         --network-path={input[1]} \
         --vehicles-number={wildcards.fleetSize} \
@@ -191,8 +194,110 @@ rule drt_vehicles:
         '''
 
 
+rule network_gpkg:
+    input:
+        jar_path=jar_path,
+        schedule_path=config_object.area_simulation_input_file_path("transit_schedule.xml.gz"),
+        network_path=config_object.area_simulation_input_file_path("network.xml.gz")
+    params:
+        crs="EPSG:2154"
+    output:
+        "%s/misc/network.gpkg" % config_object.output_path
+    threads: 1
+    resources:
+        mem_mb=2048
+    shell:
+        """
+        {java_cmd} -Xmx2G -cp {input.jar_path} org.eqasim.core.tools.ExportTransitLinesToGeopackage \
+        --schedule-path {input.schedule_path} --network-path {input.network_path} \
+        --crs {params.crs} --output-path={output[0]}
+        """
+
+for modified_transit_schedule in config_object.modified_transit_schedules.values():
+    rule:
+        name: "modified_transit_schedule_%s" % modified_transit_schedule.name
+        input:
+            schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
+            legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
+            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv")
+        params:
+            criteria = modified_transit_schedule.criteria,
+            scope = modified_transit_schedule.scope,
+            threshold = modified_transit_schedule.threshold,
+            transit_modes = modified_transit_schedule.transit_modes
+        threads: 1
+        resources:
+            mem_mb=4096
+        output:
+            config_object.get_modified_transit_schedule_path(modified_transit_schedule)
+        shell:
+            """
+            echo "Hello World"
+            """
+
+rule drt_stops:
+    input:
+        jar_path,
+        config_object.general_inputs_config.area_path,
+        cut_transit_schedule_path
+    threads: 1
+    resources:
+        mem_mb=2048
+    output:
+        config_object.area_simulation_input_file_path("drt_stops.xml")
+    shell:
+        """
+        {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.TransitScheduleToDrtStops \
+        --schedule-path {input[2]} --extent-path {input[1]} --output_path{output[0]}
+        """
+
+for deployment_scenario in config_object.deployment_scenarios.values():
+    transit_schedule_override = deployment_scenario.transit_schedule_override
+    rule:
+        name: "deployment_scenario_%s_config" % deployment_scenario.name
+        input:
+            [jar_path, cut_config_path, config_object.area_simulation_input_file_path("drt_stops.xml"), config_object.general_inputs_config.area_path] + ([config_object.get_modified_transit_schedule_path(transit_schedule_override)] if transit_schedule_override is not None else [])
+        output:
+            config_object.get_deployment_scenario_config_path(deployment_scenario)
+        threads: 1
+        resources:
+            mem_mb=2048
+        params:
+            args=lambda wildcards: config_object.get_deployment_scenario_configure_args(deployment_scenario)
+        shell:
+            """
+            {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
+            --input-path {input[1]} --output-path {output[0]} \
+            --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
+            {params.args}
+            """
+
+rule demand_identification_simulation:
+    input:
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=False, jar_path=jar_path))
+    output:
+        "%s/simulations/demand_identification/{group}/{hash}/output_plans.xml.gz" % config_object.output_path
+    shell:
+        """
+        echo {input} > {output[0]}
+        """
+
+
+rule evaluation_simulation:
+    input:
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
+    output:
+        "%s/simulations/evaluation/{group}/{hash}/test.txt" % config_object.output_path
+    shell:
+        """
+        echo {input} > {output[0]}
+        """
+
 rule all:
     default_target: True
     input:
         baseline_trips_path,
         config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv"),
+        [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()],
+        [config_object.get_deployment_scenario_config_path(deployment_scenario) for deployment_scenario in config_object.deployment_scenarios.values()],
+        ["%s/simulations/evaluation/%s/%s/test.txt" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()]

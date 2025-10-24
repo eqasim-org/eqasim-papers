@@ -1,5 +1,6 @@
 import os
-
+import hashlib
+import itertools
 
 def to_absolute(in_path, ref_path):
     if in_path is None:
@@ -68,8 +69,8 @@ class ServiceParameter:
 
 class ServiceParametersConfig:
     def __init__(self, config_dict):
-        self.demand_impacting_params = {ServiceParameter(key, value) for key, value in config_dict["demand_impacting"].items()}
-        self.non_demand_impacting_params = {ServiceParameter(key, value) for key, value in config_dict["non_demand_impacting"].items()}
+        self.demand_impacting_params = {key: ServiceParameter(key, value) for key, value in config_dict["demand_impacting"].items()}
+        self.non_demand_impacting_params = {key: ServiceParameter(key, value) for key, value in config_dict["non_demand_impacting"].items()}
 
 class ServiceType:
     UNIMODAL = "unimodal"
@@ -129,6 +130,8 @@ class DeploymentScenario:
     def __init__(self, name, config_dict, services, modified_transit_schedules):
         self.name = name
         self.services = {s: services[s] for s in config_dict["services"]}
+        assert len(self.services) <= 2
+        assert len(self.service_types) == len(self.services)
         self.simulation_overrides = dict()
         if "simulation_overrides" in config_dict:
             for key, value in config_dict["simulation_overrides"].items():
@@ -136,6 +139,14 @@ class DeploymentScenario:
                     self.simulation_overrides[key] = modified_transit_schedules[value]
                 else:
                     raise Exception("Unsupported simulation override: %s" % key)
+
+    @property
+    def transit_schedule_override(self):
+        return self.simulation_overrides["transit_schedule"] if "transit_schedule" in self.simulation_overrides else None
+
+    @property
+    def service_types(self):
+        return set(s.type for s in self.services.values())
 
 class GeneralInputsConfig:
     def __init__(self, config_dict, basedir):
@@ -145,7 +156,20 @@ class GeneralInputsConfig:
         self.area_prefix = config_dict["area_prefix"]
         assert self.area_prefix != "global_"
 
+def dctproduct(dct):
+    """
+    >>> list(dctproduct({'number': [1, 2], 'character': 'ab'}))
+    [{'number': 1, 'character': 'a'}, {'number': 1, 'character': 'b'}, {'number': 2, 'character': 'a'}, {'number': 2, 'character': 'b'}]
+    """
+    keys = dct.keys()
+    for vals in itertools.product(*dct.values()):
+        yield dict(zip(keys, vals))
+
 class PipelineConfig:
+
+    RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
+                                   "output_plans.xml.gz"]
+
     def __init__(self, config_dict, basedir, max_cores):
         self.output_path = to_absolute(config_dict["output_path"], basedir)
         self.temp_path = to_absolute(config_dict["temp_path"], basedir)
@@ -161,6 +185,16 @@ class PipelineConfig:
         self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"])
         self.deployment_scenarios = {key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in config_dict["deployment_scenarios"].items()}
 
+        self.simulation_configs = dict()
+        for deployment_scenario in self.deployment_scenarios.values():
+            new_configs = self.get_deployment_scenario_simulation_configs(deployment_scenario)
+            assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
+            self.simulation_configs.update(new_configs)
+
+
+    @staticmethod
+    def get_relevant_simulation_inputs(base_path):
+        return [os.path.join(base_path, f) for f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
 
     @property
     def global_simulation_inputs_location(self):
@@ -206,8 +240,98 @@ class PipelineConfig:
         file_name = "%d_%d.xml" % (fleet_size, vehicle_capacity)
         return os.path.join(self.area_vehicles_files_location, file_name)
 
+    def get_modified_transit_schedule_path(self, modified_transit_schedule):
+        if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
+            modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
+        return os.path.join(self.output_path, "modified_transit_schedules", "%s.xml.gz" % modified_transit_schedule.name)
+
+    def get_deployment_scenario_config_path(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        return self.area_simulation_input_file_path("config_%s.xml" % deployment_scenario.name)
+
+    def get_deployment_scenario_configure_args(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        result = ""
+        for service in deployment_scenario.services.values():
+            if service.type == ServiceType.UNIMODAL:
+                result += "--unimodal-availability %s" % service.availability
+            else:
+                result += "--intermodal-availability %s" % service.availability
+                transfer_locations_config = service.transfer_locations
+                if len(transfer_locations_config.transit_modes) > 0:
+                    result += "--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes)
+                if len(transfer_locations_config.transit_stops) > 0:
+                    result += "--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops)
+        for key, value in deployment_scenario.simulation_overrides.items():
+            if key == "transit_schedule":
+                result += "--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value)
+
+    def get_deployment_scenario_simulation_configs(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+
+        parameters_dict = dict()
+        for param_name, param in list(self.service_parameters_config.demand_impacting_params.items()) + list(self.service_parameters_config.non_demand_impacting_params.items()):
+            values = param.values
+            if param.separate_per_service:
+                values = list(dctproduct({service_type: values for service_type in deployment_scenario.service_types}))
+            assert isinstance(values, list)
+            parameters_dict[param_name] = values
+        simulation_configs = dict()
+        for demand_impacting_parameters_values in dctproduct({key: parameters_dict[key] for key in self.service_parameters_config.demand_impacting_params.keys()}):
+            demand_identification_parameter_values = dict(**demand_impacting_parameters_values)
+            for key in self.service_parameters_config.non_demand_impacting_params.keys():
+                demand_identification_parameter_values[key] = parameters_dict[key][0]
+            demand_identification_simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, demand_identification_parameter_values, self.fleet_sizing_config.demand_identification_fleet_size)
+            for non_demand_impacting_parameters_values in dctproduct(({key: parameters_dict[key] for key in self.service_parameters_config.non_demand_impacting_params.keys()})):
+                parameter_values = dict(**demand_impacting_parameters_values)
+                parameter_values.update(non_demand_impacting_parameters_values)
+                for fleet_size in self.fleet_sizing_config.fleet_sizes:
+                    simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, parameter_values, fleet_size)
+                    assert simulation_config.hash_code not in simulation_configs
+                    simulation_config.demand_source = demand_identification_simulation_config.hash_code
+                    simulation_configs[simulation_config.hash_code] = simulation_config
+            assert demand_identification_simulation_config.hash_code in simulation_configs
+            assert simulation_configs[demand_identification_simulation_config.hash_code].hash_code == simulation_configs[demand_identification_simulation_config.hash_code].demand_source
+        return simulation_configs
+
+    def get_simulation_inputs(self, hash_code, demand_identification, **kwargs):
+        simulation_config = self.simulation_configs[hash_code]
+        inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
+        inputs["vehicles"] = "%s/%d_%d.xml" % (self.area_vehicles_files_location, simulation_config.fleet_size, simulation_config.services_parameters_values["vehicle_capacity"])
+
+        if demand_identification:
+            inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
+        else:
+            inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
+
+        inputs.update(kwargs)
+        return inputs
+
 class SimulationConfig:
-    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
+    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
         self.deployment_scenario = deployment_scenario
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
+        self.fleet_size = fleet_size
+        self.hash_code = SimulationConfig.hash(self)
+        self.demand_source = None
+
+        for key, value in self.services_parameters_values.items():
+            if key == "prebooking":
+                assert isinstance(value, dict)
+                for service_type in value.keys():
+                    assert service_type in deployment_scenario.service_types
+            else:
+                assert not isinstance(value, dict)
+
+    @staticmethod
+    def hash(simulation_config):
+        d = dict(**simulation_config.services_parameters_values)
+        assert "deployment_scenario" not in d
+        assert "fleet_size" not in d
+        d["deployment_scenario"] = simulation_config.deployment_scenario.name
+        d["fleet_size"] = simulation_config.fleet_size
+        return str(hashlib.sha256(str(d).encode("utf-8")).hexdigest())
