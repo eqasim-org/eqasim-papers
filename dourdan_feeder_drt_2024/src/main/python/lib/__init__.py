@@ -348,6 +348,10 @@ class PipelineConfig:
             args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeBeta %f" % detour_factor_value)
         else:
             args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxAbsoluteDetour %f" % detour_factor_value)
+
+        operational_scheme = simulation_config.services_parameters_values["operational_scheme"]
+        if operational_scheme == "stop_based":
+            args.append("--config:multiModeDrt.drt[mode=drt].operationalScheme stopbased")
         return args
 
 class SimulationConfig:
