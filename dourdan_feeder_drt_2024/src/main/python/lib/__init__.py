@@ -280,21 +280,21 @@ class PipelineConfig:
     def get_deployment_scenario_configure_args(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        result = ""
+        result = []
         for service in deployment_scenario.services.values():
             if service.type == ServiceType.UNIMODAL:
-                result += "--unimodal-availability %s" % service.availability
+                result.append("--unimodal-availability %s" % service.availability)
             else:
-                result += "--intermodal-availability %s" % service.availability
+                result.append("--intermodal-availability %s" % service.availability)
                 transfer_locations_config = service.transfer_locations
                 if len(transfer_locations_config.transit_modes) > 0:
-                    result += "--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes)
+                    result.append("--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes))
                 if len(transfer_locations_config.transit_stops) > 0:
-                    result += "--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops)
+                    result.append("--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops))
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
-                result += "--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value)
-        return result
+                result.append("--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
+        return " ".join(result)
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
