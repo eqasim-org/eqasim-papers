@@ -258,7 +258,7 @@ rule drt_stops:
     shell:
         """
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.TransitScheduleToDrtStops \
-        --schedule-path {input[2]} --extent-path {input[1]} --output_path{output[0]}
+        --schedule-path {input[2]} --extent-path {input[1]} --output_path {output[0]}
         """
 
 for deployment_scenario in config_object.deployment_scenarios.values():
