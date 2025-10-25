@@ -250,6 +250,30 @@ class PipelineConfig:
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
         return self.area_simulation_input_file_path("config_%s.xml" % deployment_scenario.name)
 
+    def get_cost_parameters_file_path(self, deployment_scenario, unitary_cost):
+        assert isinstance(unitary_cost, str)
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        return os.path.join(self.area_simulation_inputs_location, "cost_parameters", deployment_scenario.name, "%s.yaml" % unitary_cost)
+
+    def get_cost_params(self, deployment_scenario, unitary_cost):
+        assert isinstance(unitary_cost, str)
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+
+        params = {"drtCost_EUR_access": 0,
+                  "drtCost_EUR_km": 0,
+                  "feederDrtCost_EUR_access": 0,
+                  "feederDrtCost_EUR_km": 0}
+
+        unitary_cost = float(unitary_cost)
+        if "unimodal" in deployment_scenario.service_types:
+            params["drtCost_EUR_access"] = float(unitary_cost)
+            params["drtCost_EUR_km"] = float(unitary_cost)
+        if "intermodal" in deployment_scenario.service_types:
+            params["feederDrtCost_EUR_km"] = float(unitary_cost)
+        return params
+
     def get_deployment_scenario_configure_args(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
@@ -302,6 +326,8 @@ class PipelineConfig:
         inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
         inputs["vehicles"] = "%s/%d_%d.xml" % (self.area_vehicles_files_location, simulation_config.fleet_size, simulation_config.services_parameters_values["vehicle_capacity"])
 
+        inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
+
         if demand_identification:
             inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
@@ -309,6 +335,24 @@ class PipelineConfig:
 
         inputs.update(kwargs)
         return inputs
+
+    def get_simulation_args(self, hash_code):
+        simulation_config = self.simulation_configs[hash_code]
+        args = list()
+        detour_factor = simulation_config.services_parameters_values["detour_factor"]
+        detour_factor_value = float(detour_factor[1:-1])
+        if detour_factor.endswith("%"):
+            detour_factor_value += 100
+            detour_factor_value += 100
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeAlpha %f" % detour_factor_value)
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeBeta %f" % detour_factor_value)
+        else:
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxAbsoluteDetour %f" % detour_factor_value)
+
+        operational_scheme = simulation_config.services_parameters_values["operational_scheme"]
+        if operational_scheme == "stop_based":
+            args.append("--config:multiModeDrt.drt[mode=drt].operationalScheme stopbased")
+        return args
 
 class SimulationConfig:
     def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
