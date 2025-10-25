@@ -294,6 +294,7 @@ class PipelineConfig:
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
                 result += "--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value)
+        return result
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
