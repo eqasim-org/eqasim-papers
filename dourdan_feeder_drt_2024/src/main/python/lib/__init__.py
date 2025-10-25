@@ -240,10 +240,13 @@ class PipelineConfig:
         file_name = "%d_%d.xml" % (fleet_size, vehicle_capacity)
         return os.path.join(self.area_vehicles_files_location, file_name)
 
-    def get_modified_transit_schedule_path(self, modified_transit_schedule):
+    def get_modified_transit_schedule_location(self, modified_transit_schedule):
         if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
             modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
-        return os.path.join(self.output_path, "modified_transit_schedules", "%s.xml.gz" % modified_transit_schedule.name)
+        return os.path.join(self.output_path, "modified_transit_schedules", modified_transit_schedule.name)
+
+    def get_modified_transit_schedule_path(self, modified_transit_schedule):
+        return os.path.join(str(self.get_modified_transit_schedule_location(modified_transit_schedule)), "transit_schedule.xml.gz")
 
     def get_deployment_scenario_config_path(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):

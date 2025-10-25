@@ -225,7 +225,7 @@ rule network_gpkg:
 
 for modified_transit_schedule in config_object.modified_transit_schedules.values():
     rule:
-        name: "modified_transit_schedule_%s" % modified_transit_schedule.name
+        name: "modified_transit_schedule_%s_lines" % modified_transit_schedule.name
         input:
             schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
             legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
@@ -239,10 +239,26 @@ for modified_transit_schedule in config_object.modified_transit_schedules.values
         resources:
             mem_mb=4096
         output:
+            "%s/lines_to_remove.csv" % config_object.get_modified_transit_schedule_location(modified_transit_schedule)
+        notebook:
+            "notebooks/get_unused_buses.ipynb"
+
+    rule:
+        name: "modified_transit_schedule_%s" % modified_transit_schedule.name
+        input:
+            jar = jar_path,
+            lines = "%s/lines_to_remove.csv" % config_object.get_modified_transit_schedule_location(modified_transit_schedule),
+            schedule = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
+        threads: 1
+        resources:
+            mem_mb=2048
+        output:
             config_object.get_modified_transit_schedule_path(modified_transit_schedule)
         shell:
             """
-            echo "Hello World"
+            {java_cmd} -Xmx2G -cp {input.jar}  org.eqasim.papers.dourdan_feeder_drt_2024.RemoveTransitLines \
+            --schedule-path {input.schedule} --lines-path {input.lines} \
+            --output-path {output[0]}
             """
 
 rule drt_stops:
