@@ -299,7 +299,7 @@ for deployment_scenario in config_object.deployment_scenarios.values():
             --input-path {input[1]} --output-path {output[0]} \
             --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
             --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
-            --config:mutliModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]}
+            --config:mutliModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
             {params.args}
             """
 
