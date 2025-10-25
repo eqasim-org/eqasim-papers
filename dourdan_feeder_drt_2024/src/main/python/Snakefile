@@ -155,7 +155,10 @@ rule cutter:
          --prefix={config_object.general_inputs_config.area_prefix} \
          --flag-area-link-modes=true  \
          --threads={config_object.global_simulation_resources.threads} \
-         --output-path={config_object.area_simulation_inputs_location}
+         --output-path={config_object.area_simulation_inputs_location} \
+         --config:eqasim:vdf.writeInterval 0 \
+         --config:eqasim:vdf.writeFlowInterval 0 \
+         --config:eqasim:vdf.writeTravelTimesInterval 0 \
         """
 
 
