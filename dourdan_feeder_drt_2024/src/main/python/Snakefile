@@ -200,7 +200,7 @@ rule cost_params:
         "%s/cost_parameters/{deployment_scenario}/{price}.yaml" % config_object.area_simulation_inputs_location
     run:
         import yaml
-        with open(ouput[0], "w") as f:
+        with open(output[0], "w") as f:
             yaml.dump(params, f, default_flow_style=False)
 
 
