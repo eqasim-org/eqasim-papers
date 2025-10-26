@@ -232,12 +232,14 @@ for modified_transit_schedule in config_object.modified_transit_schedules.values
         input:
             schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
             legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
-            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv")
+            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
+            area=config_object.general_inputs_config.area_path
         params:
             criteria = modified_transit_schedule.criteria,
             scope = modified_transit_schedule.scope,
             threshold = modified_transit_schedule.threshold,
-            transit_modes = modified_transit_schedule.transit_modes
+            transit_modes = modified_transit_schedule.transit_modes,
+            sampling = config_object.general_inputs_config.sampling
         threads: 1
         resources:
             mem_mb=4096

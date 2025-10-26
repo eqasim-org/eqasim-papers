@@ -154,6 +154,7 @@ class GeneralInputsConfig:
         self.input_prefix = config_dict["input_prefix"]
         self.area_path = to_absolute(config_dict["area_path"], basedir)
         self.area_prefix = config_dict["area_prefix"]
+        self.sampling = config_dict["sampling"]
         assert self.area_prefix != "global_"
 
 def dctproduct(dct):
