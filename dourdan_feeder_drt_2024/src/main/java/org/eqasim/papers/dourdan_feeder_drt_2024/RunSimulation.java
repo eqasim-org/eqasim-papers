@@ -12,11 +12,13 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.scenario.ScenarioUtils;
 
+
 public class RunSimulation {
     public static void main(String[] args) throws CommandLine.ConfigurationException {
         CommandLine cmd = new CommandLine.Builder(args) //
                 .requireOptions("config-path") //
                 .allowPrefixes("mode-choice-parameter", "cost-parameter") //
+                .allowOptions("unimodal-prebooking", "intermodal-prebooking")
                 .build();
 
         Configurator configurator = new Configurator(cmd);

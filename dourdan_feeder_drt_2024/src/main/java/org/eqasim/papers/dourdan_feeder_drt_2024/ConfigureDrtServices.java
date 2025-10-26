@@ -71,8 +71,8 @@ public class ConfigureDrtServices {
 
         if(intermodalAvailability.isPresent()) {
             AdaptConfigForFeederDrt.adapt(config, Map.of("feeder_drt", "pt"), Map.of("feeder_drt", "drt"), new HashMap<>(),
-                    intermodalTransferLocationModes.map(s -> Map.of("feeder_drt", s)).orElse(new HashMap<>()),
-                    intermodalTransferLocationIds.map(s -> Map.of("feeder_drt", s)).orElse(new HashMap<>()),
+                    Map.of("feeder_drt", intermodalTransferLocationModes.orElse("")),
+                    Map.of("feeder_drt", intermodalTransferLocationIds.orElse("")),
                     true);
 
             if(OFF_PEAK_AVAIlABILITY.equals(intermodalAvailability.get())) {
