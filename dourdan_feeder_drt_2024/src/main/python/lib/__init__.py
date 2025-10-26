@@ -356,7 +356,14 @@ class PipelineConfig:
         operational_scheme = simulation_config.services_parameters_values["operational_scheme"]
         if operational_scheme == "stop_based":
             args.append("--config:multiModeDrt.drt[mode=drt].operationalScheme stopbased")
-        return args
+
+        prebooking = simulation_config.services_parameters_values["prebooking"]
+        assert isinstance(prebooking, dict)
+        if "unimodal" in prebooking and prebooking["unimodal"] > 0:
+            args.append("--unimodal-prebooking %d" % prebooking["unimodal"])
+        if "intermodal" in prebooking and prebooking["intermodal"] > 0:
+            args.append("--intermodal-prebooking %d" % prebooking["intermodal"])
+        return " ".join(args)
 
 class SimulationConfig:
     def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
