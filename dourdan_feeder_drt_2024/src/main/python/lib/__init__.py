@@ -333,7 +333,7 @@ class PipelineConfig:
 
         inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
 
-        if demand_identification:
+        if not demand_identification:
             inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
             inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
