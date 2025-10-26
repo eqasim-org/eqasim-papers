@@ -232,12 +232,14 @@ for modified_transit_schedule in config_object.modified_transit_schedules.values
         input:
             schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
             legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
-            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv")
+            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
+            area=config_object.general_inputs_config.area_path
         params:
             criteria = modified_transit_schedule.criteria,
             scope = modified_transit_schedule.scope,
             threshold = modified_transit_schedule.threshold,
-            transit_modes = modified_transit_schedule.transit_modes
+            transit_modes = modified_transit_schedule.transit_modes,
+            sampling = config_object.general_inputs_config.sampling
         threads: 1
         resources:
             mem_mb=4096
@@ -299,13 +301,13 @@ for deployment_scenario in config_object.deployment_scenarios.values():
             --input-path {input[1]} --output-path {output[0]} \
             --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
             --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
-            --config:mutliModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
+            --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
             {params.args}
             """
 
 rule demand_identification_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=False, jar_path=jar_path))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
     output:
         ["%s/simulations/demand_identification/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     threads: config_object.area_simulation_resources.threads
@@ -317,8 +319,8 @@ rule demand_identification_simulation:
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
-        org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config {input.config} \
-        --config:multiModeDrt.drt[mode=drt] {input.vehicles} \
+        org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
+        --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
         --config:controller.outputDirectory {params.output_dir} \
         --config:eqasim.costParametersPath {input.cost_params} {params.args}
@@ -327,12 +329,20 @@ rule demand_identification_simulation:
 
 rule evaluation_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=False, jar_path=jar_path))
     output:
         ["%s/simulations/evaluation/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+    params:
+        output_dir=lambda wildcards: "%s/simulations/evaluation/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
+        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash)
     shell:
         """
-        echo {input} > {output[0]}
+        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
+        org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
+        --config:multiModeDrt.drt[mode=drt] {input.vehicles} \
+        --config:plans.inputPlansFile {input.plans} \
+        --config:controller.outputDirectory {params.output_dir} \
+        --config:eqasim.costParametersPath {input.cost_params} {params.args}
         """
 
 rule all:

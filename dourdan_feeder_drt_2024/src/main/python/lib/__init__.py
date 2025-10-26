@@ -154,6 +154,7 @@ class GeneralInputsConfig:
         self.input_prefix = config_dict["input_prefix"]
         self.area_path = to_absolute(config_dict["area_path"], basedir)
         self.area_prefix = config_dict["area_prefix"]
+        self.sampling = config_dict["sampling"]
         assert self.area_prefix != "global_"
 
 def dctproduct(dct):
@@ -293,7 +294,7 @@ class PipelineConfig:
                     result.append("--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops))
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
-                result.append("--config:transit:transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
+                result.append("--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
         return " ".join(result)
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):
@@ -332,7 +333,7 @@ class PipelineConfig:
 
         inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
 
-        if demand_identification:
+        if not demand_identification:
             inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
             inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
@@ -348,15 +349,22 @@ class PipelineConfig:
         if detour_factor.endswith("%"):
             detour_factor_value += 100
             detour_factor_value += 100
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeAlpha %f" % detour_factor_value)
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxTravelTimeBeta %f" % detour_factor_value)
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeAlpha %f" % detour_factor_value)
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeBeta %f" % detour_factor_value)
         else:
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints.drtOptimizationConstraintsSet[name=default].maxAbsoluteDetour %f" % detour_factor_value)
+            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxAbsoluteDetour %f" % detour_factor_value)
 
         operational_scheme = simulation_config.services_parameters_values["operational_scheme"]
         if operational_scheme == "stop_based":
             args.append("--config:multiModeDrt.drt[mode=drt].operationalScheme stopbased")
-        return args
+
+        prebooking = simulation_config.services_parameters_values["prebooking"]
+        assert isinstance(prebooking, dict)
+        if "unimodal" in prebooking and prebooking["unimodal"] > 0:
+            args.append("--unimodal-prebooking %d" % prebooking["unimodal"])
+        if "intermodal" in prebooking and prebooking["intermodal"] > 0:
+            args.append("--intermodal-prebooking %d" % prebooking["intermodal"])
+        return " ".join(args)
 
 class SimulationConfig:
     def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
