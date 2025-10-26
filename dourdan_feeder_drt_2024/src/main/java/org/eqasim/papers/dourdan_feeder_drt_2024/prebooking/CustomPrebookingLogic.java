@@ -25,7 +25,7 @@ public class CustomPrebookingLogic implements org.matsim.contrib.drt.prebooking.
 
     private final Map<String, Float> prebookingHorizonPerRoutingMode;
 
-    private CustomPrebookingLogic(String mode, PrebookingQueue prebookingQueue,
+    public CustomPrebookingLogic(String mode, PrebookingQueue prebookingQueue,
                                   PopulationIterator.PopulationIteratorFactory populationIteratorFactory, TimeInterpretation timeInterpretation,
                                   Map<String, Float> prebookingHorizonPerRoutingMode) {
         this.prebookingQueue = prebookingQueue;

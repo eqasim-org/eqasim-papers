@@ -6,12 +6,11 @@ import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaModule;
 import org.eqasim.papers.dourdan_feeder_drt_2024.prebooking.CustomPrebookingLogic;
 import org.matsim.contrib.drt.prebooking.logic.PrebookingLogic;
 import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
-import org.matsim.contrib.dvrp.run.AbstractDvrpModeModule;
+import org.matsim.contrib.dvrp.run.AbstractDvrpModeQSimModule;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.controler.AbstractModule;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,12 +34,6 @@ public class Configurator extends IDFConfigurator {
                     if(!element.getMode().equals("drt")) {
                         throw new IllegalStateException();
                     }
-                    install(new AbstractDvrpModeModule(element.getMode()) {
-                        @Override
-                        public void install() {
-                            bindModal(PrebookingLogic.class).to(CustomPrebookingLogic.class);
-                        }
-                    });
 
                     Map<String, Float> prebookingHorizonPerRoutingMode = new HashMap<>();
                     Optional<Float> unimodalPrebookingHorizon = commandLine.getOption("unimodal-prebooking").map(Float::parseFloat);
@@ -48,6 +41,12 @@ public class Configurator extends IDFConfigurator {
                     unimodalPrebookingHorizon.ifPresent(h -> prebookingHorizonPerRoutingMode.put("drt", h));
                     intermodalPrebookingHorizon.ifPresent(h -> prebookingHorizonPerRoutingMode.put("feeder_drt", h));
 
+                    installQSimModule(new AbstractDvrpModeQSimModule(element.getMode()) {
+                        @Override
+                        protected void configureQSim() {
+                            bindModal(PrebookingLogic.class).to(CustomPrebookingLogic.class);
+                        }
+                    });
                     installQSimModule(CustomPrebookingLogic.createModule(element, prebookingHorizonPerRoutingMode));
                 });
             }
