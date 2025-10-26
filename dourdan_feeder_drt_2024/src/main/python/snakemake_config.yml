@@ -6,10 +6,10 @@ java: # Java and Maven command lines
 resources:
   global_simulations:
     threads: 10
-    memory: "50G"
+    memory: "1000G"
   area_simulations:
     threads: 10
-    memory: "5G"
+    memory: "50G"
 
 general_inputs:
   input_path: "inputs/simulation_inputs"
@@ -38,7 +38,7 @@ service_parameters:
     vehicle_capacity: [4, 8]
     prebooking:
       separate_per_service: true
-      values: [0, 10]
+      values: [0, 600]
 
 
 services:
