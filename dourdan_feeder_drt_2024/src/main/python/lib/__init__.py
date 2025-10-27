@@ -392,4 +392,7 @@ class SimulationConfig:
         assert "fleet_size" not in d
         d["deployment_scenario"] = simulation_config.deployment_scenario.name
         d["fleet_size"] = simulation_config.fleet_size
-        return str(hashlib.sha256(str(d).encode("utf-8")).hexdigest())
+        keys = list(d.keys())
+        keys.sort()
+        l = [(key, d[key]) for key in keys]
+        return str(hashlib.sha256(str(l).encode("utf-8")).hexdigest())
