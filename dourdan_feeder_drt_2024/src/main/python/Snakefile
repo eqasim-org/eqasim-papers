@@ -198,13 +198,13 @@ rule drt_vehicles:
 
 rule cost_params:
     params:
-        lambda wildcards: config_object.get_cost_params(wildcards.deployment_scenario, wildcards.price)
+        cost_params=lambda wildcards: config_object.get_cost_params(wildcards.deployment_scenario, wildcards.price)
     output:
         "%s/cost_parameters/{deployment_scenario}/{price}.yaml" % config_object.area_simulation_inputs_location
     run:
         import yaml
         with open(output[0], "w") as f:
-            yaml.dump(params, f, default_flow_style=False)
+            yaml.dump(params.cost_params, f, default_flow_style=False)
 
 
 rule network_gpkg:
