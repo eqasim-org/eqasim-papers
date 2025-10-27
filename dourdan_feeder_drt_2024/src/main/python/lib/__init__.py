@@ -395,14 +395,24 @@ class SimulationConfig:
             else:
                 assert not isinstance(value, dict)
 
-    @staticmethod
-    def hash(simulation_config):
-        d = dict(**simulation_config.services_parameters_values)
+    def get_dict(self):
+        d = dict(**self.services_parameters_values)
         assert "deployment_scenario" not in d
         assert "fleet_size" not in d
-        d["deployment_scenario"] = simulation_config.deployment_scenario.name
-        d["fleet_size"] = simulation_config.fleet_size
-        keys = list(d.keys())
-        keys.sort()
-        l = [(key, d[key]) for key in keys]
+        d["deployment_scenario"] = self.deployment_scenario.name
+        d["fleet_size"] = self.fleet_size
+        return d
+
+    @staticmethod
+    def dict_to_deterministic_list(d):
+        if isinstance(d, dict):
+            keys = list(d.keys())
+            keys.sort()
+            return [(key, SimulationConfig.dict_to_deterministic_list(d[key])) for key in keys]
+        return d
+
+    @staticmethod
+    def hash(simulation_config):
+        d = simulation_config.get_dict()
+        l = SimulationConfig.dict_to_deterministic_list(d)
         return str(hashlib.sha256(str(l).encode("utf-8")).hexdigest())
