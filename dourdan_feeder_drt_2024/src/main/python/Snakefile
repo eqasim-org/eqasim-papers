@@ -308,7 +308,7 @@ for deployment_scenario in config_object.deployment_scenarios.values():
 
 rule demand_identification_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path, log_if_fail="debugging/%s_%s.json" % (wildcards.group, wildcards.hash)))
     output:
         ["%s/simulations/demand_identification/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     threads: config_object.area_simulation_resources.threads
@@ -345,6 +345,11 @@ rule evaluation_simulation:
         --config:controller.outputDirectory {params.output_dir} \
         --config:eqasim.costParametersPath {input.cost_params} {params.args}
         """
+
+import json
+with open("debugging/main.json","w") as log:
+    d = {key: item.services_parameters_values for key, item in config_object.simulation_configs.items()}
+    log.write(json.dumps(d))
 
 rule all:
     default_target: True
