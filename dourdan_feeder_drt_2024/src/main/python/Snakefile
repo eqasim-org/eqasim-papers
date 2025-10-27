@@ -349,7 +349,7 @@ rule evaluation_simulation:
 import json
 with open("debugging/main.json","w") as log:
     d = {key: item.services_parameters_values for key, item in config_object.simulation_configs.items()}
-    log.write(json.dumps(d))
+    log.write(json.dumps(d, indent=4))
 
 rule all:
     default_target: True

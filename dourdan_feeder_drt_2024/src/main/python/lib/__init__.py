@@ -334,7 +334,7 @@ class PipelineConfig:
             if log_if_fail is not None:
                 with open(log_if_fail, "w") as log:
                     d = {key: item.services_parameters_values for key, item in self.simulation_configs.items()}
-                    log.write(json.dumps(d))
+                    log.write(json.dumps(d, indent=4))
             raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code, len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 
