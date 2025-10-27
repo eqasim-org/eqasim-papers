@@ -5,12 +5,11 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.inject.Provides;
 import org.eqasim.core.components.config.EqasimConfigGroup;
 import org.eqasim.core.simulation.mode_choice.ParameterDefinition;
-import org.eqasim.ile_de_france.mode_choice.IDFModeAvailability;
 import org.eqasim.ile_de_france.mode_choice.IDFModeChoiceModule;
+import org.eqasim.ile_de_france.mode_choice.parameters.IDFCostParameters;
 import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.costs.FeederDrtCostModel;
 import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.parameters.CostParameters;
 import org.matsim.core.config.CommandLine;
-import org.matsim.core.config.Config;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 
 import java.io.File;
@@ -34,6 +33,7 @@ public class ModeChoiceModule extends IDFModeChoiceModule {
         super.installEqasimExtension();
 
         bindCostModel(FEEDER_DRT_COST_MODEL).to(FeederDrtCostModel.class);
+        bind(IDFCostParameters.class).to(CostParameters.class);
     }
 
     @Provides
