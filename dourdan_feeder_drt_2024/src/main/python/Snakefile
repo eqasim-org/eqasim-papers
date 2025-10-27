@@ -302,6 +302,7 @@ for deployment_scenario in config_object.deployment_scenarios.values():
             --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
             --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
             --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
+            --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator
             {params.args}
             """
 
