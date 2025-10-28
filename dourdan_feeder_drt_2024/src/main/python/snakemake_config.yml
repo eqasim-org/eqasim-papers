@@ -6,7 +6,10 @@ java: # Java and Maven command lines
 resources:
   global_simulations:
     threads: 10
-    memory: "1000G"
+    memory: "300G"
+  cutter:
+    threads: 100
+    memory: "300G"
   area_simulations:
     threads: 10
     memory: "50G"

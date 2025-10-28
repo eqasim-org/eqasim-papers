@@ -142,19 +142,19 @@ rule cutter:
         cut_config_path,
         cut_network_path,
         cut_transit_schedule_path
-    threads: config_object.global_simulation_resources.threads
+    threads: config_object.cutter_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory)
+        mem_mb=memory_string_to_mb(config_object.cutter_resources.memory)
     shell:
         """
-        {java_cmd} -cp "{input[0]}" -Xmx{config_object.global_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
+        {java_cmd} -cp "{input[0]}" -Xmx{config_object.cutter_resources.memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
         --config-path={input[1]} --plans-path={input[2]} \
          --events-path={input[3]} \
          --vdf-travel-times-path={input[4]} \
          --extent-path={config_object.general_inputs_config.area_path} \
          --prefix={config_object.general_inputs_config.area_prefix} \
          --flag-area-link-modes=true  \
-         --threads={config_object.global_simulation_resources.threads} \
+         --threads={config_object.cutter_resources.threads} \
          --output-path={config_object.area_simulation_inputs_location} \
          --config:eqasim:vdf.writeInterval 0 \
          --config:eqasim:vdf.writeFlowInterval 0 \
