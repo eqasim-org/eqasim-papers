@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.inject.Provides;
 import org.eqasim.core.components.config.EqasimConfigGroup;
+import org.eqasim.core.simulation.mode_choice.AbstractEqasimExtension;
 import org.eqasim.core.simulation.mode_choice.ParameterDefinition;
 import org.eqasim.ile_de_france.mode_choice.IDFModeChoiceModule;
 import org.eqasim.ile_de_france.mode_choice.parameters.IDFCostParameters;
@@ -15,7 +16,7 @@ import org.matsim.core.controler.OutputDirectoryHierarchy;
 import java.io.File;
 import java.io.IOException;
 
-public class ModeChoiceModule extends IDFModeChoiceModule {
+public class ModeChoiceModule extends AbstractEqasimExtension {
 
     public static String SINGLE_USAGE_FLEETS_MODE_AVAILABILITY = "SingleUsageFleetsModeAvailability";
     public static String DUAL_USAGE_FLEETS_MODE_AVAILABILITY = "DualUsageFleetsModeAvailability";
@@ -24,13 +25,11 @@ public class ModeChoiceModule extends IDFModeChoiceModule {
     private final CommandLine commandLine;
 
     public ModeChoiceModule(CommandLine commandLine) {
-        super(commandLine);
         this.commandLine = commandLine;
     }
 
     @Override
     protected void installEqasimExtension() {
-        super.installEqasimExtension();
 
         bindCostModel(FEEDER_DRT_COST_MODEL).to(FeederDrtCostModel.class);
         bind(IDFCostParameters.class).to(CostParameters.class);
