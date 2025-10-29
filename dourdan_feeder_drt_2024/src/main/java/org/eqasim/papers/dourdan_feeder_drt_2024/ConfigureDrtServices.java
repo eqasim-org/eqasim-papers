@@ -5,6 +5,7 @@ import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstr
 import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstraintSingleLegConfigGroup;
 import org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt;
 import org.eqasim.core.simulation.modes.feeder_drt.utils.AdaptConfigForFeederDrt;
+import org.eqasim.papers.dourdan_feeder_drt_2024.mode_choice.ModeChoiceModule;
 import org.matsim.contrib.drt.prebooking.PrebookingParams;
 import org.matsim.contrib.drt.run.DrtConfigGroup;
 import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
@@ -14,10 +15,7 @@ import org.matsim.core.config.ConfigGroup;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.utils.collections.Tuple;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class ConfigureDrtServices {
 
@@ -65,7 +63,7 @@ public class ConfigureDrtServices {
             throw new IllegalStateException("One of intermodal-transfer-location-modes and intermodal-transfer-location-ids must be specified for the intermodal service");
         }
 
-        AdaptConfigForDrt.adapt(config, Map.of("drt", "drt_vehicles.xml"), Map.of("drt", "door2door"), new HashMap<>(), new HashMap<>(), new HashMap<>(), "30:00:00", unimodalAvailability.isPresent());
+        AdaptConfigForDrt.adapt(config, Map.of("drt", "drt_vehicles.xml"), Map.of("drt", "door2door"), new HashMap<>(), Map.of("drt", ModeChoiceModule.FEEDER_DRT_COST_MODEL), new HashMap<>(), "30:00:00", unimodalAvailability.isPresent());
 
 
         if(OFF_PEAK_AVAIlABILITY.equals(unimodalAvailability.orElse("null"))) {
@@ -77,6 +75,12 @@ public class ConfigureDrtServices {
                     Map.of("feeder_drt", intermodalTransferLocationModes.orElse("")),
                     Map.of("feeder_drt", intermodalTransferLocationIds.orElse("")),
                     true);
+
+            EqasimConfigGroup.get(config).setCostModel("feeder_drt", ModeChoiceModule.FEEDER_DRT_COST_MODEL);
+
+            if(unimodalAvailability.isPresent()) {
+                EqasimConfigGroup.get(config).setAdditionalAvailableModes(Set.of("drt", "feeder_drt"));
+            }
 
             if(OFF_PEAK_AVAIlABILITY.equals(intermodalAvailability.get())) {
                 addOffPeakLegTimeConstraint(config, "feeder_drt");
