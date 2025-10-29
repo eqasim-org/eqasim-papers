@@ -372,7 +372,7 @@ class PipelineConfig:
         inputs.update(kwargs)
         return inputs
 
-    def get_simulation_args(self, hash_code):
+    def get_simulation_args(self, hash_code, demand_identification):
         simulation_config = self.hash_to_config(hash_code)
         args = list()
         detour_factor = simulation_config.services_parameters_values["detour_factor"]
@@ -395,6 +395,11 @@ class PipelineConfig:
             args.append("--unimodal-prebooking %d" % prebooking["unimodal"])
         if "intermodal" in prebooking and prebooking["intermodal"] > 0:
             args.append("--intermodal-prebooking %d" % prebooking["intermodal"])
+
+        if demand_identification:
+            args.append("--config:controller.lastIteration 100")
+        else:
+            args.append("--config:controller.lastIteration 0")
         return " ".join(args)
 
 class SimulationConfig:

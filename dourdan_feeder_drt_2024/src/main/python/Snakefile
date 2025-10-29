@@ -293,6 +293,7 @@ rule deployment_scenario_config:
         --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
         --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
         --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator \
+        --config:dvrp.networkModes inside_car \
         {params.args}
         """
 
@@ -306,7 +307,7 @@ rule demand_identification_simulation:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
     params:
         output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
-        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash)
+        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
@@ -325,7 +326,7 @@ rule evaluation_simulation:
         ["%s/simulations/evaluation/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     params:
         output_dir=lambda wildcards: "%s/simulations/evaluation/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
-        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash)
+        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
