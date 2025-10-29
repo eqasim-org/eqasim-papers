@@ -352,12 +352,8 @@ class PipelineConfig:
             assert simulation_configs[demand_identification_simulation_config.hash_code].hash_code == simulation_configs[demand_identification_simulation_config.hash_code].demand_source
         return simulation_configs
 
-    def hash_to_config(self, hash_code, log_if_fail=None):
+    def hash_to_config(self, hash_code):
         if hash_code not in self.simulation_configs:
-            if log_if_fail is not None:
-                with open(log_if_fail, "w") as log:
-                    d = {key: item.services_parameters_values for key, item in self.simulation_configs.items()}
-                    log.write(json.dumps(d, indent=4))
             raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code, len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 

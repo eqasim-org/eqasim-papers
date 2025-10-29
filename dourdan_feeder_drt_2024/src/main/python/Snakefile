@@ -287,7 +287,6 @@ rule deployment_scenario_config:
         args=lambda wildcards: config_object.get_deployment_scenario_configure_args(wildcards.deployment_scenario)
     shell:
         """
-        echo "{params.args}"
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
         --input-path {input[1]} --output-path {output[0]} \
         --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
@@ -299,7 +298,7 @@ rule deployment_scenario_config:
 
 rule demand_identification_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path, log_if_fail="debugging/%s_%s.json" % (wildcards.group, wildcards.hash)))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
     output:
         ["%s/simulations/demand_identification/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     threads: config_object.area_simulation_resources.threads
@@ -337,10 +336,6 @@ rule evaluation_simulation:
         --config:eqasim.costParametersPath {input.cost_params} {params.args}
         """
 
-import json
-with open("debugging/main.json","w") as log:
-    d = {key: item.services_parameters_values for key, item in config_object.simulation_configs.items()}
-    log.write(json.dumps(d, indent=4))
 
 rule all:
     default_target: True
