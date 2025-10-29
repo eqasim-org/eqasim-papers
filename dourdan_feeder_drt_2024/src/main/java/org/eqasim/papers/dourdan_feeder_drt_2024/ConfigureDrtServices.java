@@ -5,6 +5,9 @@ import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstr
 import org.eqasim.core.simulation.mode_choice.constraints.leg_time.LegTimeConstraintSingleLegConfigGroup;
 import org.eqasim.core.simulation.modes.drt.utils.AdaptConfigForDrt;
 import org.eqasim.core.simulation.modes.feeder_drt.utils.AdaptConfigForFeederDrt;
+import org.matsim.contrib.drt.prebooking.PrebookingParams;
+import org.matsim.contrib.drt.run.DrtConfigGroup;
+import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigGroup;
@@ -78,6 +81,14 @@ public class ConfigureDrtServices {
             if(OFF_PEAK_AVAIlABILITY.equals(intermodalAvailability.get())) {
                 addOffPeakLegTimeConstraint(config, "feeder_drt");
             }
+        }
+
+        for(DrtConfigGroup drtConfigGroup: MultiModeDrtConfigGroup.get(config).getModalElements()) {
+            PrebookingParams prebookingParams = new PrebookingParams();
+            prebookingParams.setAbortRejectedPrebookings(true);
+            prebookingParams.setScheduleWaitBeforeDrive(false);
+            prebookingParams.setUnschedulingMode(PrebookingParams.UnschedulingMode.Routing);
+            drtConfigGroup.addParameterSet(new PrebookingParams());
         }
 
         commandLine.applyConfiguration(config);
