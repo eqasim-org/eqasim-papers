@@ -293,6 +293,7 @@ rule deployment_scenario_config:
         --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
         --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
         --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator \
+        --config:dvrp.networkModes inside_car \
         {params.args}
         """
 
