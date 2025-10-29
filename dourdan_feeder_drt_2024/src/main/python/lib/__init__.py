@@ -296,6 +296,7 @@ class PipelineConfig:
                     result.append("--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops))
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
+                print("Configuring transit schedule %s for %s" % (value, deployment_scenario.name))
                 result.append("--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
