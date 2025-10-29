@@ -357,8 +357,8 @@ class PipelineConfig:
             raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code, len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 
-    def get_simulation_inputs(self, hash_code, demand_identification, log_if_fail=None, **kwargs):
-        simulation_config = self.hash_to_config(hash_code, log_if_fail=log_if_fail)
+    def get_simulation_inputs(self, hash_code, demand_identification, **kwargs):
+        simulation_config = self.hash_to_config(hash_code)
         inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
         inputs["vehicles"] = "%s/%d_%d.xml" % (self.area_vehicles_files_location, simulation_config.fleet_size, simulation_config.services_parameters_values["vehicle_capacity"])
 
@@ -372,8 +372,8 @@ class PipelineConfig:
         inputs.update(kwargs)
         return inputs
 
-    def get_simulation_args(self, hash_code, log_if_fail=None):
-        simulation_config = self.hash_to_config(hash_code, log_if_fail=log_if_fail)
+    def get_simulation_args(self, hash_code):
+        simulation_config = self.hash_to_config(hash_code)
         args = list()
         detour_factor = simulation_config.services_parameters_values["detour_factor"]
         detour_factor_value = float(detour_factor[1:-1])
