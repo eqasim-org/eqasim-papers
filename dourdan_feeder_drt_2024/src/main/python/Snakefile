@@ -226,6 +226,8 @@ rule network_gpkg:
         --crs {params.crs} --output-path={output[0]}
         """
 
+def get_modified_transit_schedule_line_params(wildcards):
+    return config_object.get_modified_transit_schedule_params(wildcards.schedule)
 
 rule modified_transit_schedule_lines:
     input:
@@ -234,7 +236,7 @@ rule modified_transit_schedule_lines:
         pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
         area=config_object.general_inputs_config.area_path
     params:
-        lambda wildcards: config_object.get_modified_transit_schedule_params(wildcards.schedule)
+        get_modified_transit_schedule_line_params
     threads: 1
     resources:
         mem_mb=4096
