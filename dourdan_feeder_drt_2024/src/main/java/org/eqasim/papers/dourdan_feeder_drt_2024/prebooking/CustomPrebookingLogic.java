@@ -92,7 +92,7 @@ public class CustomPrebookingLogic implements org.matsim.contrib.drt.prebooking.
                             getter.get(TimeInterpretation.class),
                             prebookingHorizonPerRoutingMode);
                 }));
-                addModalQSimComponentBinding().to(modalKey(AttributeBasedPrebookingLogic.class));
+                addModalQSimComponentBinding().to(modalKey(CustomPrebookingLogic.class));
             }
         };
     }

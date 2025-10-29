@@ -41,12 +41,6 @@ public class Configurator extends IDFConfigurator {
                     unimodalPrebookingHorizon.ifPresent(h -> prebookingHorizonPerRoutingMode.put("drt", h));
                     intermodalPrebookingHorizon.ifPresent(h -> prebookingHorizonPerRoutingMode.put("feeder_drt", h));
 
-                    installQSimModule(new AbstractDvrpModeQSimModule(element.getMode()) {
-                        @Override
-                        protected void configureQSim() {
-                            bindModal(PrebookingLogic.class).to(CustomPrebookingLogic.class);
-                        }
-                    });
                     installQSimModule(CustomPrebookingLogic.createModule(element, prebookingHorizonPerRoutingMode));
                 });
             }
