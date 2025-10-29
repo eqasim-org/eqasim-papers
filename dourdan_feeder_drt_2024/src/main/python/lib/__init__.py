@@ -300,6 +300,7 @@ class PipelineConfig:
                 result.append("--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
+        result.append("--config:controller.outputDirectory %s" % deployment_scenario.name)
         return " ".join(result)
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):
