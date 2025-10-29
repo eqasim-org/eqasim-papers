@@ -226,45 +226,39 @@ rule network_gpkg:
         --crs {params.crs} --output-path={output[0]}
         """
 
-for modified_transit_schedule in config_object.modified_transit_schedules.values():
-    rule:
-        name: "modified_transit_schedule_%s_lines" % modified_transit_schedule.name
-        input:
-            schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
-            legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
-            pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
-            area=config_object.general_inputs_config.area_path
-        params:
-            criteria = modified_transit_schedule.criteria,
-            scope = modified_transit_schedule.scope,
-            threshold = modified_transit_schedule.threshold,
-            transit_modes = modified_transit_schedule.transit_modes,
-            sampling = config_object.general_inputs_config.sampling
-        threads: 1
-        resources:
-            mem_mb=4096
-        output:
-            "%s/lines_to_remove.csv" % config_object.get_modified_transit_schedule_location(modified_transit_schedule)
-        notebook:
-            "notebooks/get_unused_buses.ipynb"
 
-    rule:
-        name: "modified_transit_schedule_%s" % modified_transit_schedule.name
-        input:
-            jar = jar_path,
-            lines = "%s/lines_to_remove.csv" % config_object.get_modified_transit_schedule_location(modified_transit_schedule),
-            schedule = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
-        threads: 1
-        resources:
-            mem_mb=2048
-        output:
-            config_object.get_modified_transit_schedule_path(modified_transit_schedule)
-        shell:
-            """
-            {java_cmd} -Xmx2G -cp {input.jar}  org.eqasim.papers.dourdan_feeder_drt_2024.RemoveTransitLines \
-            --schedule-path {input.schedule} --lines-path {input.lines} \
-            --output-path {output[0]}
-            """
+rule modified_transit_schedule_lines:
+    input:
+        schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
+        legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
+        pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
+        area=config_object.general_inputs_config.area_path
+    params:
+        lambda wildcards: config_object.get_modified_transit_schedule_params(wildcards.schedule)
+    threads: 1
+    resources:
+        mem_mb=4096
+    output:
+        "%s/modified_transit_schedules/{schedule}/lines_to_remove.csv" % config_object.output_path
+    notebook:
+        "notebooks/get_unused_buses.ipynb"
+
+rule modified_transit_schedule:
+    input:
+        jar = jar_path,
+        lines = "%s/modified_transit_schedules/{schedule}/lines_to_remove.csv" % config_object.output_path,
+        schedule = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
+    threads: 1
+    resources:
+        mem_mb=2048
+    output:
+        "%s/modified_transit_schedules/{schedule}/transit_schedule.xml.gz" % config_object.output_path
+    shell:
+        """
+        {java_cmd} -Xmx2G -cp {input.jar}  org.eqasim.papers.dourdan_feeder_drt_2024.RemoveTransitLines \
+        --schedule-path {input.schedule} --lines-path {input.lines} \
+        --output-path {output[0]}
+        """
 
 rule drt_stops:
     input:
@@ -282,30 +276,27 @@ rule drt_stops:
         --schedule-path {input[2]} --extent-path {input[1]} --output-path {output[0]}
         """
 
-for deployment_scenario in config_object.deployment_scenarios.values():
-    transit_schedule_override = deployment_scenario.transit_schedule_override
-    rule:
-        name: "deployment_scenario_%s_config" % deployment_scenario.name
-        input:
-            [jar_path, cut_config_path, config_object.area_simulation_input_file_path("drt_stops.xml"), config_object.general_inputs_config.area_path] + ([config_object.get_modified_transit_schedule_path(transit_schedule_override)] if transit_schedule_override is not None else [])
-        output:
-            config_object.get_deployment_scenario_config_path(deployment_scenario)
-        threads: 1
-        resources:
-            mem_mb=2048
-        params:
-            args=lambda wildcards: config_object.get_deployment_scenario_configure_args(deployment_scenario)
-        shell:
-            """
-            echo "{params.args}"
-            {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
-            --input-path {input[1]} --output-path {output[0]} \
-            --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
-            --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
-            --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
-            --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator \
-            {params.args}
-            """
+rule deployment_scenario_config:
+    input:
+        lambda wildcards: [jar_path] + config_object.get_deployment_scenario_configure_inputs(wildcards.deployment_scenario)
+    output:
+        "%s/%sconfig_{deployment_scenario}.xml" % (config_object.area_simulation_inputs_location, config_object.general_inputs_config.area_prefix)
+    threads: 1
+    resources:
+        mem_mb=2048
+    params:
+        args=lambda wildcards: config_object.get_deployment_scenario_configure_args(wildcards.deployment_scenario)
+    shell:
+        """
+        echo "{params.args}"
+        {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
+        --input-path {input[1]} --output-path {output[0]} \
+        --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
+        --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
+        --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
+        --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator \
+        {params.args}
+        """
 
 rule demand_identification_simulation:
     input:

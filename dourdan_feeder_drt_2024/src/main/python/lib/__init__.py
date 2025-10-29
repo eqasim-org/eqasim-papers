@@ -251,6 +251,17 @@ class PipelineConfig:
     def get_modified_transit_schedule_path(self, modified_transit_schedule):
         return os.path.join(str(self.get_modified_transit_schedule_location(modified_transit_schedule)), "transit_schedule.xml.gz")
 
+    def get_modified_transit_schedule_params(self, modified_transit_schedule):
+        if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
+            modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
+        params = dict()
+        params["criteria"] = modified_transit_schedule.criteria
+        params["scope"] = modified_transit_schedule.scope
+        params["threshold"] = modified_transit_schedule.threshold
+        params["transit_modes"] = modified_transit_schedule.transit_modes
+        params["sampling"] = self.general_inputs_config.sampling
+        return params
+
     def get_deployment_scenario_config_path(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
@@ -279,6 +290,15 @@ class PipelineConfig:
         if "intermodal" in deployment_scenario.service_types:
             params["feederDrtCost_EUR_km"] = float(unitary_cost)
         return params
+
+    def get_deployment_scenario_configure_inputs(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+        inputs = [self.area_baseline_config_path, self.area_simulation_input_file_path("drt_stops.xml"), self.general_inputs_config.area_path]
+        transit_schedule_override = deployment_scenario.transit_schedule_override
+        if transit_schedule_override is not None:
+            inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override))
+        return inputs
 
     def get_deployment_scenario_configure_args(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
