@@ -139,9 +139,9 @@ rule area_buffer:
         buffer_length=config_object.general_inputs_config.area_buffer_length
     run:
         import geopandas as gpd
-        gdf = gpd.read_file(snakemake.input[0])
-        gdf = gpd.GeoDataFrame(geometry=gdf.buffer(snakemake.params.buffer_length), crs=gdf.crs)
-        gdf.to_file(snakemake.output[0])
+        gdf = gpd.read_file(input[0])
+        gdf = gpd.GeoDataFrame(geometry=gdf.buffer(params.buffer_length), crs=gdf.crs)
+        gdf.to_file(output[0])
 
 rule cutter:
     input:
