@@ -130,6 +130,19 @@ cut_config_path = config_object.area_baseline_config_path
 cut_network_path = config_object.area_simulation_input_file_path("network.xml.gz")
 cut_transit_schedule_path = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
 
+rule area_buffer:
+    input:
+        config_object.general_inputs_config.area_path
+    output:
+        "%s/misc/%sarea_buffer.gpkg" % (config_object.output_path, config_object.general_inputs_config.area_prefix)
+    params:
+        buffer_length=config_object.general_inputs_config.buffer_length
+    run:
+        import geopandas as gpd
+        gdf = gpd.read_file(snakemake.input[0])
+        gdf = gpd.GeoDataFrame(geometry=gdf.buffer(snakemake.params.buffer_length), crs=gdf.crs)
+        gdf.to_file(snakemake.output[0])
+
 rule cutter:
     input:
         jar_path,
@@ -137,7 +150,7 @@ rule cutter:
         baseline_plans_path,
         baseline_events_path,
         baseline_travel_times_path,
-        config_object.general_inputs_config.area_path
+        "%s/misc/%sarea_buffer.gpkg" % (config_object.output_path, config_object.general_inputs_config.area_prefix)
     output:
         cut_config_path,
         cut_network_path,
