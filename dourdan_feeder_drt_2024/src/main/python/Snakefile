@@ -276,7 +276,8 @@ rule drt_stops:
     input:
         jar_path,
         config_object.general_inputs_config.area_path,
-        cut_transit_schedule_path
+        cut_transit_schedule_path,
+        cut_network_path
     threads: 1
     resources:
         mem_mb=2048
@@ -285,7 +286,9 @@ rule drt_stops:
     shell:
         """
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.TransitScheduleToDrtStops \
-        --schedule-path {input[2]} --extent-path {input[1]} --output-path {output[0]}
+        --schedule-path {input[2]} --extent-path {input[1]} --network-path {input[3]} \
+        --mode inside_car \
+        --output-path {output[0]}
         """
 
 rule deployment_scenario_config:
