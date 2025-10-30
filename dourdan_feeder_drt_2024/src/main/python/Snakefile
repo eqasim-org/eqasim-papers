@@ -164,7 +164,7 @@ rule cutter:
         --config-path={input[1]} --plans-path={input[2]} \
          --events-path={input[3]} \
          --vdf-travel-times-path={input[4]} \
-         --extent-path={config_object.general_inputs_config.area_path} \
+         --extent-path={input[5]} \
          --prefix={config_object.general_inputs_config.area_prefix} \
          --flag-area-link-modes=true  \
          --threads={config_object.cutter_resources.threads} \
