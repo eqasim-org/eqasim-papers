@@ -136,7 +136,7 @@ rule area_buffer:
     output:
         "%s/misc/%sarea_buffer.gpkg" % (config_object.output_path, config_object.general_inputs_config.area_prefix)
     params:
-        buffer_length=config_object.general_inputs_config.buffer_length
+        buffer_length=config_object.general_inputs_config.area_buffer_length
     run:
         import geopandas as gpd
         gdf = gpd.read_file(snakemake.input[0])
