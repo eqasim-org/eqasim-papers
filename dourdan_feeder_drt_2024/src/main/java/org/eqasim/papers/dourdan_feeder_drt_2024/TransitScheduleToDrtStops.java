@@ -76,6 +76,6 @@ public class TransitScheduleToDrtStops {
 
         transitSchedule.getFacilities().values().stream().map(f -> projectTransitStopFacilityOnNetwork(f, network, transitSchedule.getFactory(), maxDistance)).forEach(newSchedule::addStopFacility);
 
-        new TransitScheduleWriter(transitSchedule).writeFile(commandLine.getOptionStrict("output-path"));
+        new TransitScheduleWriter(newSchedule).writeFile(commandLine.getOptionStrict("output-path"));
     }
 }
