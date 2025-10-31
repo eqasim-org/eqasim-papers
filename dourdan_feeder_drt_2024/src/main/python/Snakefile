@@ -186,7 +186,7 @@ rule area_simulation_baseline:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
     shell:
         '''
-        {java_cmd} -cp {jar_path} org.eqasim.ile_de_france.RunSimulation -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
+        {java_cmd} -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 -cp {jar_path} org.eqasim.ile_de_france.RunSimulation \
         --config-path {cut_config_path} \
         --config:global.numberOfThreads {config_object.area_simulation_resources.threads} \
         --config:controller.outputDirectory {config_object.area_baseline_simulation_outputs_location} \
