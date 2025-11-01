@@ -28,7 +28,7 @@ public class TransitScheduleToDrtStops {
             throw new IllegalStateException(String.format("Cannot find close enough link to stop %s with name %s", transitStopFacility.getId().toString(), transitStopFacility.getName()));
         }
         TransitStopFacility newFacility = transitScheduleFactory.createTransitStopFacility(transitStopFacility.getId(), link.getCoord(), transitStopFacility.getIsBlockingLane());
-        newFacility.setLinkId(transitStopFacility.getLinkId());
+        newFacility.setLinkId(link.getId());
         return newFacility;
     }
 
