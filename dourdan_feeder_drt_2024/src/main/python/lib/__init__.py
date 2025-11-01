@@ -299,6 +299,7 @@ class PipelineConfig:
         transit_schedule_override = deployment_scenario.transit_schedule_override
         if transit_schedule_override is not None:
             inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override))
+            inputs.append(os.path.join(str(self.get_modified_transit_schedule_location(transit_schedule_override)), "plans.xml.gz"))
         return inputs
 
     def get_deployment_scenario_configure_args(self, deployment_scenario):
@@ -318,6 +319,7 @@ class PipelineConfig:
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
                 result.append("--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
+                result.append("--config:plans.inputPlansFile %s" % os.path.join(str(self.get_modified_transit_schedule_location(value)), "plans.xml.gz"))
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
         result.append("--config:controller.outputDirectory %s" % deployment_scenario.name)

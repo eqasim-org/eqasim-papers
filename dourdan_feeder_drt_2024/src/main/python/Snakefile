@@ -272,6 +272,25 @@ rule modified_transit_schedule:
         --output-path {output[0]}
         """
 
+rule modified_transit_schedule_plans:
+    input:
+        jar = jar_path,
+        schedule = "%s/modified_transit_schedules/{schedule}/transit_schedule.xml.gz" % config_object.output_path,
+        config = config_object.area_baseline_config_path,
+        plans = config_object.area_baseline_simulation_output_file_path("output_plans.xml.gz")
+    threads: config_object.area_simulation_resources.threads
+    resources:
+        mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory)
+    output:
+        "%s/modified_transit_schedules/{schedule}/plans.xml.gz" % config_object.output_path
+    shell:
+        """
+        {java_cmd} -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar} \
+        --config-path {input.config} --config:transit.transitScheduleFile {input.schedule} \
+        --config:plans.inputPlansFile {input.plans} \
+        --modes pt --threads {threads} --output-path {output[0]}
+        """
+
 rule drt_stops:
     input:
         jar_path,
