@@ -369,7 +369,7 @@ rule evaluation_simulation:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
         org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
-        --config:multiModeDrt.drt[mode=drt] {input.vehicles} \
+        --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
         --config:controller.outputDirectory {params.output_dir} \
         --config:eqasim.costParametersPath {input.cost_params} {params.args}
