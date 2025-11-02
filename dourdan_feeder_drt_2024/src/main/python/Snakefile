@@ -375,6 +375,20 @@ rule evaluation_simulation:
         --config:eqasim.costParametersPath {input.cost_params} {params.args}
         """
 
+rule simulation_summary:
+    input:
+        lambda wildcards: ["%s/simulations/evaluation/%s/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+    output:
+        "%s/simulations/evaluation/{group}/{hash}/summary.yaml" % config_object.output_path
+    params:
+        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
+    threads: 1
+    resources:
+        mem_mb=1024
+    run:
+        with open(output[0], "w") as f:
+            yaml.dump(params.summary,  f, default_flow_style=False)
+
 
 rule all:
     default_target: True
@@ -383,4 +397,5 @@ rule all:
         config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv"),
         [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()],
         [config_object.get_deployment_scenario_config_path(deployment_scenario) for deployment_scenario in config_object.deployment_scenarios.values()],
-        ["%s/simulations/evaluation/%s/%s/output_plans.xml.gz" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()]
+        ["%s/simulations/evaluation/%s/%s/output_plans.xml.gz" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
+        ["%s/simulations/evaluation/%s/%s/summary.yaml" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()]
