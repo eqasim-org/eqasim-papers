@@ -387,6 +387,7 @@ rule simulation_summary:
     resources:
         mem_mb=1024
     run:
+        import yaml
         with open(output[0], "w") as f:
             yaml.dump(params.summary,  f, default_flow_style=False)
 
