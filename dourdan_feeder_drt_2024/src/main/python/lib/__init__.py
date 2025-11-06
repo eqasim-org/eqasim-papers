@@ -182,6 +182,7 @@ class PipelineConfig:
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
         self.area_simulation_resources = ResourcesConfig(config_dict["resources"]["area_simulations"], max_cores)
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
+        self.area_routing_resources = ResourcesConfig(config_dict["resources"]["area_arouting"], max_cores)
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
         self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in config_dict["modified_transit_schedules"].items()}
         self.service_parameters_config = ServiceParametersConfig(config_dict["service_parameters"])

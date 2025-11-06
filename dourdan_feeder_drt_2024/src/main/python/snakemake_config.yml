@@ -13,6 +13,9 @@ resources:
   area_simulations:
     threads: 10
     memory: "50G"
+  area_routing:
+    threads: 100
+    memory: "100G"
 
 general_inputs:
   input_path: "inputs/simulation_inputs"
