@@ -48,6 +48,7 @@ public class RemoveTransitLines {
         List<Tuple<Id<TransitStopFacility>, Id<TransitStopFacility>>> transfersToRemove = new ArrayList<>();
         MinimalTransferTimes.MinimalTransferTimesIterator iterator = transitSchedule.getMinimalTransferTimes().iterator();
         while(iterator.hasNext()) {
+            iterator.next();
             // We check with used facilities to also handle transfers that were invalid even before running this program
             if(!usedFacilities.contains(iterator.getFromStopId()) || !usedFacilities.contains(iterator.getToStopId())) {
                 transfersToRemove.add(new Tuple<>(iterator.getFromStopId(), iterator.getToStopId()));
