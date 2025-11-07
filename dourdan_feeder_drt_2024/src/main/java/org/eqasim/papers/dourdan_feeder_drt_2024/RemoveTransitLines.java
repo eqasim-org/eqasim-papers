@@ -42,7 +42,7 @@ public class RemoveTransitLines {
                 .map(Identifiable::getId)
                 .forEach(usedFacilities::add);
 
-        transitSchedule.getFacilities().values().stream().filter(f -> usedFacilities.contains(f.getId())).forEach(unusedFacilities::add);
+        transitSchedule.getFacilities().values().stream().filter(f -> !usedFacilities.contains(f.getId())).forEach(unusedFacilities::add);
 
         // Transfers with non existing facilities
         List<Tuple<Id<TransitStopFacility>, Id<TransitStopFacility>>> transfersToRemove = new ArrayList<>();
