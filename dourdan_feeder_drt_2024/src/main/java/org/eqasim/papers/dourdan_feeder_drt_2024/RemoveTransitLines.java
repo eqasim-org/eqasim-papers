@@ -20,7 +20,7 @@ public class RemoveTransitLines {
 
 
         // Routes with no departures
-        transitSchedule.getTransitLines().values().stream()
+        transitSchedule.getTransitLines().values()
                 .forEach(l -> l.getRoutes().values().stream().filter(r -> r.getDepartures().isEmpty())
                         .toList()
                         .forEach(l::removeRoute));
