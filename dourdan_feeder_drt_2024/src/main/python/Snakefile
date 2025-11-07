@@ -96,7 +96,8 @@ rule baseline_config:
         --output-config-path="{output[0]}" --engine=true \
         --config:eqasim:vdf_engine.generateNetworkEvents=true \
         --config:eqasim:vdf.writeTravelTimesInterval=1 --config:controller.lastIteration=0 \
-        --config:swissRailRaptor.transferCalculation=Adaptive
+        --config:swissRailRaptor.transferCalculation=Adaptive \
+        --config:eqasim:vdf.handler Horizon
         """
 
 baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv")
