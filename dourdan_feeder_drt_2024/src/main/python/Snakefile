@@ -289,6 +289,7 @@ rule modified_transit_schedule_plans:
         org.eqasim.core.scenario.routing.RunPopulationRouting \
         --config-path {input.config} --config:transit.transitScheduleFile {input.schedule} \
         --config:plans.inputPlansFile {input.plans} \
+        --config:swissRailRaptor.transferCalculation Initial \
         --modes pt --threads {threads} --output-path {output[0]}
         """
 
