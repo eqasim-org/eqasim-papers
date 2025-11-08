@@ -1,5 +1,7 @@
 package org.eqasim.papers.dourdan_feeder_drt_2024;
 
+import com.google.inject.Inject;
+import jakarta.inject.Provider;
 import org.eqasim.ile_de_france.IDFConfigurator;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaConfigGroup;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaModule;
@@ -9,7 +11,15 @@ import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
 import org.matsim.contrib.dvrp.run.AbstractDvrpModeQSimModule;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.controler.AbstractModule;
+import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.controler.events.ShutdownEvent;
+import org.matsim.core.controler.listener.ControllerListener;
+import org.matsim.core.controler.listener.ShutdownListener;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +53,25 @@ public class Configurator extends IDFConfigurator {
 
                     installQSimModule(CustomPrebookingLogic.createModule(element, prebookingHorizonPerRoutingMode));
                 });
+
+                addControllerListenerBinding().toProvider(new Provider<ControllerListener>() {
+                    @Inject
+                    OutputDirectoryHierarchy outputDirectoryHierarchy;
+                    @Override
+                    public ControllerListener get() {
+                        return (ShutdownListener) shutdownEvent -> {
+                            String filePath = outputDirectoryHierarchy.getIterationFilename(shutdownEvent.getIteration(), "dvrp_travel_times.csv.gz");
+                            File file = new File(filePath);
+                            if(Files.exists(file.toPath())) {
+                                try {
+                                    Files.copy(file.toPath(), new File(outputDirectoryHierarchy.getOutputFilename("dvrp_travel_times.csv.gz")).toPath());
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        };
+                    }
+                }).asEagerSingleton();
             }
         }, MultiModeDrtConfigGroup.GROUP_NAME);
     }
