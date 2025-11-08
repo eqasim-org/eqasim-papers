@@ -354,7 +354,8 @@ rule demand_identification_simulation:
         --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
         --config:controller.outputDirectory {params.output_dir} \
-        --config:eqasim.costParametersPath {input.cost_params} {params.args}
+        --config:eqasim.costParametersPath {input.cost_params} {params.args} \
+        --config:transit.transitScheduleFile {input.transit_schedule}
         """
 
 
@@ -377,7 +378,8 @@ rule evaluation_simulation:
         --config:plans.inputPlansFile {input.plans} \
         --config:controller.outputDirectory {params.output_dir} \
         --config:eqasim.costParametersPath {input.cost_params} {params.args} \
-        --config:dvrp.initialTravelTimesFile {input.dvrp_travel_times}
+        --config:dvrp.initialTravelTimesFile {input.dvrp_travel_times} \
+        --config:transit.transitScheduleFile {input.transit_schedule}
         """
 
 rule simulation_summary:

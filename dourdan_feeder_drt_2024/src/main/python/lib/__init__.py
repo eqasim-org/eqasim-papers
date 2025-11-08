@@ -367,11 +367,21 @@ class PipelineConfig:
 
         inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
 
+        transit_schedule = simulation_config.deployment_scenario.transit_schedule_override
+
+        if transit_schedule is not None:
+            inputs["transit_schedule"] = self.get_modified_transit_schedule_path(transit_schedule)
+        else:
+            inputs["transit_schedule"] = self.area_simulation_input_file_path("transit_schedule.xml.gz")
+
         if not demand_identification:
             inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
             inputs["dvrp_travel_times"] = "%s/simulations/demand_identification/%s/%s/dvrp_travel_times.csv.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
-            inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
+            if transit_schedule is not None:
+                inputs["plans"] = "%s/plans.xml.gz" % self.get_modified_transit_schedule_location(transit_schedule)
+            else:
+                inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
 
         inputs.update(kwargs)
         return inputs
