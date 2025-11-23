@@ -2,6 +2,7 @@ import json
 import os
 import hashlib
 import itertools
+import random
 
 def to_absolute(in_path, ref_path):
     if in_path is None:
@@ -117,14 +118,15 @@ class SingleServiceConfig:
             assert "transfer_locations" not in config_dict
 
 class FleetSizingConfig:
-    def __init__(self, config_dict):
+    def __init__(self, config_dict, random_seed):
         self.demand_identification_fleet_size = config_dict["demand_identification_fleet_size"]
-        self.fleet_sizes = config_dict["fleet_sizes"]
+        r = random.Random(random_seed)
+        self.fleet_seeds = [r.randint(1, 999999) for _ in range(int(config_dict["fleet_seeds"]))]
         self.max_rejection_rate = config_dict["max_rejection_rate"]
+        self.fleet_size_precision = config_dict["fleet_size_precision"]
+        assert self.demand_identification_fleet_size % self.fleet_size_precision == 0
 
         assert isinstance(self.demand_identification_fleet_size, int)
-        for v in self.fleet_sizes:
-            assert isinstance(v, int)
         float(self.max_rejection_rate)
 
 class DeploymentScenario:
@@ -187,7 +189,7 @@ class PipelineConfig:
         self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in config_dict["modified_transit_schedules"].items()}
         self.service_parameters_config = ServiceParametersConfig(config_dict["service_parameters"])
         self.services_config = {key: SingleServiceConfig(key, value) for key, value in config_dict["services"].items()}
-        self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"])
+        self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"], self.random_seed)
         self.deployment_scenarios = {key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in config_dict["deployment_scenarios"].items()}
 
         self.simulation_configs = dict()
@@ -342,15 +344,16 @@ class PipelineConfig:
             demand_identification_parameter_values = dict(**demand_impacting_parameters_values)
             for key in self.service_parameters_config.non_demand_impacting_params.keys():
                 demand_identification_parameter_values[key] = parameters_dict[key][0]
-            demand_identification_simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, demand_identification_parameter_values, self.fleet_sizing_config.demand_identification_fleet_size)
+            demand_identification_simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, demand_identification_parameter_values)
             for non_demand_impacting_parameters_values in dctproduct(({key: parameters_dict[key] for key in self.service_parameters_config.non_demand_impacting_params.keys()})):
                 parameter_values = dict(**demand_impacting_parameters_values)
                 parameter_values.update(non_demand_impacting_parameters_values)
-                for fleet_size in self.fleet_sizing_config.fleet_sizes:
-                    simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, parameter_values, fleet_size)
-                    assert simulation_config.hash_code not in simulation_configs
-                    simulation_config.demand_source = demand_identification_simulation_config.hash_code
-                    simulation_configs[simulation_config.hash_code] = simulation_config
+                simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config,
+                                                     parameter_values)
+                assert simulation_config.hash_code not in simulation_configs
+                simulation_config.demand_source = demand_identification_simulation_config.hash_code
+                simulation_configs[simulation_config.hash_code] = simulation_config
+
             assert demand_identification_simulation_config.hash_code in simulation_configs
             assert simulation_configs[demand_identification_simulation_config.hash_code].hash_code == simulation_configs[demand_identification_simulation_config.hash_code].demand_source
         return simulation_configs
@@ -360,10 +363,23 @@ class PipelineConfig:
             raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code, len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 
-    def get_simulation_inputs(self, hash_code, demand_identification, **kwargs):
+    def get_simulation_inputs(self, hash_code, demand_identification, fleet_size=None, random_seed=None, **kwargs):
         simulation_config = self.hash_to_config(hash_code)
         inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
-        inputs["vehicles"] = "%s/%d_%d.xml" % (self.area_vehicles_files_location, simulation_config.fleet_size, simulation_config.services_parameters_values["vehicle_capacity"])
+
+        if demand_identification:
+            assert fleet_size is None and random_seed is None
+            fleet_size = self.fleet_sizing_config.demand_identification_fleet_size
+            random_seed = self.fleet_sizing_config.fleet_seeds[0]
+        else:
+            assert fleet_size is not None and random_seed is not None
+
+        if isinstance(fleet_size, str):
+            fleet_size = int(fleet_size)
+        if isinstance(random_seed, str):
+            random_seed = int(random_seed)
+
+        inputs["vehicles"] = "%s/%d_%d_%d.xml" % (self.area_vehicles_files_location, fleet_size, simulation_config.services_parameters_values["vehicle_capacity"], random_seed)
 
         inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
 
@@ -417,11 +433,10 @@ class PipelineConfig:
         return " ".join(args)
 
 class SimulationConfig:
-    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict, fleet_size: int):
+    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
         self.deployment_scenario = deployment_scenario
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
-        self.fleet_size = fleet_size
         self.hash_code = SimulationConfig.hash(self)
         self.demand_source = None
 
@@ -438,7 +453,6 @@ class SimulationConfig:
         assert "deployment_scenario" not in d
         assert "fleet_size" not in d
         d["deployment_scenario"] = self.deployment_scenario.name
-        d["fleet_size"] = self.fleet_size
         return d
 
     @staticmethod
