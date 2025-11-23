@@ -409,7 +409,7 @@ checkpoint fleet_size_evaluation:
 
 
 def fleet_sizing_input(wildcards):
-    left = config_object.fleet_sizing_config.fleet_size_precision
+    left = int(config_object.fleet_sizing_config.fleet_size_precision)
     left_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=left)
     left_rejection_rate = get_rejection_rate(os.path.dirname(left_checkpoint.output[0]))
 
@@ -421,10 +421,10 @@ def fleet_sizing_input(wildcards):
         right_value = get_rejection_rate(os.path.dirname(right_checkpoint.output[0]))
         if right_value > config_object.fleet_sizing_config.max_rejection_rate:
             left = right
-        else:
             right *= 2
+        else:
             break
-    while right - left > config_object.fleet_sizing_config.fleet_sizing_precision:
+    while right - left > int(config_object.fleet_sizing_config.fleet_sizing_precision):
         middle = int( (right + left) / 2)
         middle_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
         middle_value = get_rejection_rate(os.path.dirname(middle_checkpoint.output[0]))
