@@ -366,7 +366,7 @@ rule fleet_sizing_simulation:
     output:
         ["%s/simulations/fleet_sizing/{group}/{hash}/{fleet_size}/seeds/{seed}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
     params:
-        output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s_%s" % (config_object.output_path, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
+        output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
         args = lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False)
     threads: config_object.area_simulation_resources.threads
     resources:
