@@ -18,7 +18,7 @@ resources:
     memory: "50G"
 
 general_inputs:
-  input_path: "inputs/simulation_inputs_1pct"
+  input_path: "inputs/simulation_inputs"
   input_prefix: "ile_de_france_"
   area_prefix: "drn_"
   area_path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
