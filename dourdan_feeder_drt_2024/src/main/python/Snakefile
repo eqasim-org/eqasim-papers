@@ -424,7 +424,7 @@ def fleet_sizing_input(wildcards):
             right *= 2
         else:
             break
-    while right - left > int(config_object.fleet_sizing_config.fleet_sizing_precision):
+    while right - left > int(config_object.fleet_sizing_config.fleet_size_precision):
         middle = int( (right + left) / 2)
         middle_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
         middle_value = get_rejection_rate(os.path.dirname(middle_checkpoint.output[0]))
