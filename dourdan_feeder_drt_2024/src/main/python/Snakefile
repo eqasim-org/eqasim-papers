@@ -200,6 +200,9 @@ rule drt_vehicles:
         cut_network_path
     output:
         "%s/{fleetSize}_{vehicleCapacity}_{seed}.xml" % config_object.area_vehicles_files_location
+    resources:
+        mem_mb=4096
+    threads: 1
     shell:
         '''
         {java_cmd} -cp {input[0]} org.eqasim.core.simulation.modes.drt.utils.CreateDrtVehicles \
