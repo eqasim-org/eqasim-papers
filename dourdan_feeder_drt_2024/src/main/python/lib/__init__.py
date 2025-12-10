@@ -30,6 +30,9 @@ class ResourcesConfig:
     def __init__(self, config_dict, max_cores):
         self.threads = min(max_cores, int(config_dict["threads"]))
         self.memory = config_dict["memory"]
+        self.runtime = 60 * 24
+        if "runtime" in config_dict:
+            self.runtime = int(config_dict["runtime"])
 
 class ModifiedTransitScheduleConfig:
     def __init__(self, name, config_dict):
