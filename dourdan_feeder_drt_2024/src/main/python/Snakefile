@@ -211,7 +211,8 @@ rule drt_vehicles:
         --vehicles-capacity={wildcards.vehicleCapacity} \
         --network-modes=inside_car \
         --output-vehicles-path={output[0]} \
-        --random-seed={wildcards.seed}
+        --random-seed={wildcards.seed} \
+        --service-end-time=180000
         '''
 
 rule cost_params:
