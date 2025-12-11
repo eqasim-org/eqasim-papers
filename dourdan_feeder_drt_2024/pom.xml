@@ -47,7 +47,7 @@
         <dependency>
             <groupId>com.github.eqasim-org</groupId>
             <artifactId>eqasim-java</artifactId>
-            <version>7df856d983</version>
+            <version>9ef8732cdd</version>
         </dependency>
     </dependencies>
 
