@@ -409,9 +409,8 @@ class PipelineConfig:
         detour_factor_value = float(detour_factor[1:-1])
         if detour_factor.endswith("%"):
             detour_factor_value += 100
-            detour_factor_value += 100
+            detour_factor_value /= 100
             args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeAlpha %f" % detour_factor_value)
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeBeta %f" % detour_factor_value)
         else:
             args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxAbsoluteDetour %f" % detour_factor_value)
 
