@@ -391,8 +391,10 @@ rule fleet_sizing_simulation:
 
 def get_rejection_rate(sim_path):
     import pandas as pd
-    df = pd.read_csv("%s/eqasim_drt_passenger_rides.csv" % sim_path, sep=";")
-    return df["vehicle_id"].isna().sum() / len(df)
+    df = pd.read_csv("%s/drt_customer_stats_drt.csv" % sim_path, sep=";")
+    requests = df.iloc[-1]["rides"] + df.iloc[-1]["rejections"]
+    rejection_rate = df.iloc[-1]["rejections"] / requests
+    return rejection_rate
 
 checkpoint fleet_size_evaluation:
     input:
@@ -433,7 +435,7 @@ def fleet_sizing_input(wildcards):
         middle = int( (right + left) / 2)
         middle_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
         middle_value = get_rejection_rate(os.path.dirname(middle_checkpoint.output[0]))
-        if middle_value > float(config_object.fleet_sizing_config.max_rejection_rate):
+        if middle_value < float(config_object.fleet_sizing_config.max_rejection_rate):
             right = middle
             right_checkpoint = middle_checkpoint
         else:
