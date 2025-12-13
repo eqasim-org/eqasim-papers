@@ -407,8 +407,17 @@ checkpoint fleet_size_evaluation:
     run:
         import os
         import shutil
-        # Dummy selection of any seed
-        selected_dir = os.path.dirname(input[0])
+        # We select the seed with minimum rejection rate
+        dirs = set([os.path.dirname(i) for i in input])
+        selected_dir = None
+        min_rejection_rate = None
+        for dir in dirs:
+            current_rejection_rate = get_rejection_rate(dir)
+            if min_rejection_rate is None or current_rejection_rate < min_rejection_rate:
+                min_rejection_rate = current_rejection_rate
+                selected_dir = dir
+        if min_rejection_rate is None:
+            raise Exception("No input!")
         dest_dir = os.path.dirname(output[0])
         shutil.rmtree(dest_dir, ignore_errors=True)
         shutil.copytree(selected_dir, dest_dir)
