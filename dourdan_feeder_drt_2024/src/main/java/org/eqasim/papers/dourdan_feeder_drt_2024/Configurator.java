@@ -6,20 +6,16 @@ import org.eqasim.ile_de_france.IDFConfigurator;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaConfigGroup;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaModule;
 import org.eqasim.papers.dourdan_feeder_drt_2024.prebooking.CustomPrebookingLogic;
-import org.matsim.contrib.drt.prebooking.logic.PrebookingLogic;
 import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
-import org.matsim.contrib.dvrp.run.AbstractDvrpModeQSimModule;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.controler.events.ShutdownEvent;
 import org.matsim.core.controler.listener.ControllerListener;
 import org.matsim.core.controler.listener.ShutdownListener;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +50,7 @@ public class Configurator extends IDFConfigurator {
                     installQSimModule(CustomPrebookingLogic.createModule(element, prebookingHorizonPerRoutingMode));
                 });
 
-                addControllerListenerBinding().toProvider(new Provider<ControllerListener>() {
+                addControllerListenerBinding().toProvider(new Provider<>() {
                     @Inject
                     OutputDirectoryHierarchy outputDirectoryHierarchy;
                     @Override
