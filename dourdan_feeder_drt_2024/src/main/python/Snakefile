@@ -468,30 +468,6 @@ rule fleet_sizing:
         shutil.rmtree(dest_dir_path, ignore_errors=True)
         shutil.copytree(source_dir_path, dest_dir_path)
 
-rule evaluation_simulation:
-    input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=False, jar_path=jar_path))
-    output:
-        ["%s/simulations/evaluation/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
-    params:
-        output_dir=lambda wildcards: "%s/simulations/evaluation/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
-        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False)
-    threads: config_object.area_simulation_resources.threads
-    resources:
-        mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240
-    shell:
-        """
-        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
-        org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
-        --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
-        --config:plans.inputPlansFile {input.plans} \
-        --config:controller.outputDirectory {params.output_dir} \
-        --config:eqasim.costParametersPath {input.cost_params} {params.args} \
-        --config:dvrp.initialTravelTimesFile {input.dvrp_travel_times} \
-        --config:transit.transitScheduleFile {input.transit_schedule}
-        """
-
-
 
 rule simulation_summary:
     input:
