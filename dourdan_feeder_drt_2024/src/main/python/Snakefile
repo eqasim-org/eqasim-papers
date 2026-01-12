@@ -440,6 +440,9 @@ def fleet_sizing_input(wildcards):
             right *= 2
         else:
             break
+        if config_object.fleet_sizing_config.max_fleet_size is not None and config_object.fleet_sizing_config.max_fleet_size < right:
+            return right_checkpoint.output[0]
+
     while right - left > int(config_object.fleet_sizing_config.fleet_size_precision):
         middle = int( (right + left) / 2)
         middle_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=middle)

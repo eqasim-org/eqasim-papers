@@ -4,27 +4,31 @@ import hashlib
 import itertools
 import random
 
+
 def to_absolute(in_path, ref_path):
     if in_path is None:
         return None
     if os.path.isabs(in_path):
         return in_path
-    return os.path.normpath(os.path.join(ref_path,in_path))
+    return os.path.normpath(os.path.join(ref_path, in_path))
+
 
 def memory_string_to_mb(memory_string):
     assert isinstance(memory_string, str)
-    nb = int(memory_string[0:len(memory_string)-1])
+    nb = int(memory_string[0:len(memory_string) - 1])
     if memory_string.endswith("G"):
         nb *= 1024
     elif memory_string.endswith("M"):
         raise Exception("Bad memory format")
     return nb
 
+
 class JavaConfig:
     def __init__(self, config_dict):
         self.java_cmd = config_dict["java_cmd"]
         self.mvn_cmd = config_dict["mvn_cmd"]
         self.mvn_local_repo = config_dict["local_maven_repo"]
+
 
 class ResourcesConfig:
     def __init__(self, config_dict, max_cores):
@@ -34,6 +38,7 @@ class ResourcesConfig:
         if "runtime" in config_dict:
             self.runtime = int(config_dict["runtime"])
 
+
 class ModifiedTransitScheduleConfig:
     def __init__(self, name, config_dict):
         self.name = name
@@ -41,6 +46,7 @@ class ModifiedTransitScheduleConfig:
         self.transit_modes = config_dict["transit_modes"]
         self.scope = config_dict["scope"]
         self.threshold = config_dict["threshold"]
+
 
 class ServiceParameter:
     def __init__(self, name, values):
@@ -72,14 +78,19 @@ class ServiceParameter:
         else:
             raise Exception("Unsupported service parameter: %s" % self.name)
 
+
 class ServiceParametersConfig:
     def __init__(self, config_dict):
-        self.demand_impacting_params = {key: ServiceParameter(key, value) for key, value in config_dict["demand_impacting"].items()}
-        self.non_demand_impacting_params = {key: ServiceParameter(key, value) for key, value in config_dict["non_demand_impacting"].items()}
+        self.demand_impacting_params = {key: ServiceParameter(key, value) for key, value in
+                                        config_dict["demand_impacting"].items()}
+        self.non_demand_impacting_params = {key: ServiceParameter(key, value) for key, value in
+                                            config_dict["non_demand_impacting"].items()}
+
 
 class ServiceType:
     UNIMODAL = "unimodal"
     INTERMODAL = "intermodal"
+
     def __init__(self):
         raise Exception("This class is not meant to be instantiated")
 
@@ -88,9 +99,11 @@ class ServiceType:
         assert service_type in [ServiceType.UNIMODAL, ServiceType.INTERMODAL]
         return service_type
 
+
 class ServiceAvailability:
     ALL_DAY = "all_day"
     OFF_PEAK = "off_peak"
+
     def __init__(self):
         raise Exception("This class is not meant to be instantiated")
 
@@ -98,6 +111,7 @@ class ServiceAvailability:
     def check(availability: str):
         assert availability in [ServiceAvailability.ALL_DAY, ServiceAvailability.OFF_PEAK]
         return availability
+
 
 class TransferLocationsConfig:
 
@@ -108,6 +122,7 @@ class TransferLocationsConfig:
             self.transit_modes = config_dict["transit_modes"]
         if "transit_stops" in config_dict:
             self.transit_stops = config_dict["transit_stops"]
+
 
 class SingleServiceConfig:
     def __init__(self, name, config_dict):
@@ -120,6 +135,7 @@ class SingleServiceConfig:
         else:
             assert "transfer_locations" not in config_dict
 
+
 class FleetSizingConfig:
     def __init__(self, config_dict, random_seed):
         self.demand_identification_fleet_size = config_dict["demand_identification_fleet_size"]
@@ -127,10 +143,14 @@ class FleetSizingConfig:
         self.fleet_seeds = [r.randint(1, 999999) for _ in range(int(config_dict["fleet_seeds"]))]
         self.max_rejection_rate = config_dict["max_rejection_rate"]
         self.fleet_size_precision = config_dict["fleet_size_precision"]
+        self.max_fleet_size = None
+        if "max_fleet_size" in config_dict:
+            self.max_fleet_size = int(config_dict["max_fleet_size"])
+            assert self.max_fleet_size > self.demand_identification_fleet_size and self.max_fleet_size >= self.fleet_size_precision * 10
         assert self.demand_identification_fleet_size % self.fleet_size_precision == 0
-
         assert isinstance(self.demand_identification_fleet_size, int)
         float(self.max_rejection_rate)
+
 
 class DeploymentScenario:
     def __init__(self, name, config_dict, services, modified_transit_schedules):
@@ -148,11 +168,13 @@ class DeploymentScenario:
 
     @property
     def transit_schedule_override(self):
-        return self.simulation_overrides["transit_schedule"] if "transit_schedule" in self.simulation_overrides else None
+        return self.simulation_overrides[
+            "transit_schedule"] if "transit_schedule" in self.simulation_overrides else None
 
     @property
     def service_types(self):
         return set(s.type for s in self.services.values())
+
 
 class GeneralInputsConfig:
     def __init__(self, config_dict, basedir):
@@ -164,6 +186,7 @@ class GeneralInputsConfig:
         self.sampling = config_dict["sampling"]
         assert self.area_prefix != "global_"
 
+
 def dctproduct(dct):
     """
     >>> list(dctproduct({'number': [1, 2], 'character': 'ab'}))
@@ -173,8 +196,8 @@ def dctproduct(dct):
     for vals in itertools.product(*dct.values()):
         yield dict(zip(keys, vals))
 
-class PipelineConfig:
 
+class PipelineConfig:
     RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
                                    "output_plans.xml.gz"]
 
@@ -189,18 +212,20 @@ class PipelineConfig:
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
         self.area_routing_resources = ResourcesConfig(config_dict["resources"]["area_routing"], max_cores)
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
-        self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in config_dict["modified_transit_schedules"].items()}
+        self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in
+                                           config_dict["modified_transit_schedules"].items()}
         self.service_parameters_config = ServiceParametersConfig(config_dict["service_parameters"])
         self.services_config = {key: SingleServiceConfig(key, value) for key, value in config_dict["services"].items()}
         self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"], self.random_seed)
-        self.deployment_scenarios = {key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in config_dict["deployment_scenarios"].items()}
+        self.deployment_scenarios = {
+            key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in
+            config_dict["deployment_scenarios"].items()}
 
         self.simulation_configs = dict()
         for deployment_scenario in self.deployment_scenarios.values():
             new_configs = self.get_deployment_scenario_simulation_configs(deployment_scenario)
             assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
             self.simulation_configs.update(new_configs)
-
 
     @staticmethod
     def get_relevant_simulation_inputs(base_path):
@@ -211,7 +236,8 @@ class PipelineConfig:
         return os.path.join(self.temp_path, "simulation_inputs")
 
     def global_simulation_input_file_path(self, file_name):
-        return os.path.join(self.global_simulation_inputs_location, "%s%s" % (self.general_inputs_config.input_prefix, file_name))
+        return os.path.join(self.global_simulation_inputs_location,
+                            "%s%s" % (self.general_inputs_config.input_prefix, file_name))
 
     @property
     def global_baseline_config_path(self):
@@ -229,7 +255,8 @@ class PipelineConfig:
         return os.path.join(self.output_path, "scenarios", "%sscenario" % self.general_inputs_config.area_prefix)
 
     def area_simulation_input_file_path(self, file_name):
-        return os.path.join(self.area_simulation_inputs_location, "%s%s" % (self.general_inputs_config.area_prefix, file_name))
+        return os.path.join(self.area_simulation_inputs_location,
+                            "%s%s" % (self.general_inputs_config.area_prefix, file_name))
 
     @property
     def area_baseline_config_path(self):
@@ -256,7 +283,8 @@ class PipelineConfig:
         return os.path.join(self.output_path, "modified_transit_schedules", modified_transit_schedule.name)
 
     def get_modified_transit_schedule_path(self, modified_transit_schedule):
-        return os.path.join(str(self.get_modified_transit_schedule_location(modified_transit_schedule)), "transit_schedule.xml.gz")
+        return os.path.join(str(self.get_modified_transit_schedule_location(modified_transit_schedule)),
+                            "transit_schedule.xml.gz")
 
     def get_modified_transit_schedule_params(self, modified_transit_schedule):
         if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
@@ -278,7 +306,8 @@ class PipelineConfig:
         assert isinstance(unitary_cost, str)
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        return os.path.join(self.area_simulation_inputs_location, "cost_parameters", deployment_scenario.name, "%s.yaml" % unitary_cost)
+        return os.path.join(self.area_simulation_inputs_location, "cost_parameters", deployment_scenario.name,
+                            "%s.yaml" % unitary_cost)
 
     def get_cost_params(self, deployment_scenario, unitary_cost):
         assert isinstance(unitary_cost, str)
@@ -301,11 +330,13 @@ class PipelineConfig:
     def get_deployment_scenario_configure_inputs(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        inputs = [self.area_baseline_config_path, self.area_simulation_input_file_path("drt_stops.xml"), self.general_inputs_config.area_path]
+        inputs = [self.area_baseline_config_path, self.area_simulation_input_file_path("drt_stops.xml"),
+                  self.general_inputs_config.area_path]
         transit_schedule_override = deployment_scenario.transit_schedule_override
         if transit_schedule_override is not None:
             inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override))
-            inputs.append(os.path.join(str(self.get_modified_transit_schedule_location(transit_schedule_override)), "plans.xml.gz"))
+            inputs.append(os.path.join(str(self.get_modified_transit_schedule_location(transit_schedule_override)),
+                                       "plans.xml.gz"))
         return inputs
 
     def get_deployment_scenario_configure_args(self, deployment_scenario):
@@ -319,13 +350,17 @@ class PipelineConfig:
                 result.append("--intermodal-availability %s" % service.availability)
                 transfer_locations_config = service.transfer_locations
                 if len(transfer_locations_config.transit_modes) > 0:
-                    result.append("--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes))
+                    result.append(
+                        "--intermodal-transfer-location-modes %s" % ",".join(transfer_locations_config.transit_modes))
                 if len(transfer_locations_config.transit_stops) > 0:
-                    result.append("--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops))
+                    result.append(
+                        "--intermodal-transfer-location-ids %s" % ",".join(transfer_locations_config.transit_stops))
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
-                result.append("--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
-                result.append("--config:plans.inputPlansFile %s" % os.path.join(str(self.get_modified_transit_schedule_location(value)), "plans.xml.gz"))
+                result.append(
+                    "--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
+                result.append("--config:plans.inputPlansFile %s" % os.path.join(
+                    str(self.get_modified_transit_schedule_location(value)), "plans.xml.gz"))
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
         result.append("--config:controller.outputDirectory %s" % deployment_scenario.name)
@@ -336,19 +371,24 @@ class PipelineConfig:
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
 
         parameters_dict = dict()
-        for param_name, param in list(self.service_parameters_config.demand_impacting_params.items()) + list(self.service_parameters_config.non_demand_impacting_params.items()):
+        for param_name, param in list(self.service_parameters_config.demand_impacting_params.items()) + list(
+                self.service_parameters_config.non_demand_impacting_params.items()):
             values = param.values
             if param.separate_per_service:
                 values = list(dctproduct({service_type: values for service_type in deployment_scenario.service_types}))
             assert isinstance(values, list)
             parameters_dict[param_name] = values
         simulation_configs = dict()
-        for demand_impacting_parameters_values in dctproduct({key: parameters_dict[key] for key in self.service_parameters_config.demand_impacting_params.keys()}):
+        for demand_impacting_parameters_values in dctproduct(
+                {key: parameters_dict[key] for key in self.service_parameters_config.demand_impacting_params.keys()}):
             demand_identification_parameter_values = dict(**demand_impacting_parameters_values)
             for key in self.service_parameters_config.non_demand_impacting_params.keys():
                 demand_identification_parameter_values[key] = parameters_dict[key][0]
-            demand_identification_simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config, demand_identification_parameter_values)
-            for non_demand_impacting_parameters_values in dctproduct(({key: parameters_dict[key] for key in self.service_parameters_config.non_demand_impacting_params.keys()})):
+            demand_identification_simulation_config = SimulationConfig(deployment_scenario,
+                                                                       self.service_parameters_config,
+                                                                       demand_identification_parameter_values)
+            for non_demand_impacting_parameters_values in dctproduct(({key: parameters_dict[key] for key in
+                                                                       self.service_parameters_config.non_demand_impacting_params.keys()})):
                 parameter_values = dict(**demand_impacting_parameters_values)
                 parameter_values.update(non_demand_impacting_parameters_values)
                 simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config,
@@ -358,12 +398,14 @@ class PipelineConfig:
                 simulation_configs[simulation_config.hash_code] = simulation_config
 
             assert demand_identification_simulation_config.hash_code in simulation_configs
-            assert simulation_configs[demand_identification_simulation_config.hash_code].hash_code == simulation_configs[demand_identification_simulation_config.hash_code].demand_source
+            assert simulation_configs[demand_identification_simulation_config.hash_code].hash_code == \
+                   simulation_configs[demand_identification_simulation_config.hash_code].demand_source
         return simulation_configs
 
     def hash_to_config(self, hash_code):
         if hash_code not in self.simulation_configs:
-            raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code, len(self.simulation_configs)))
+            raise Exception("Simulation config with hash '%s' not found among the %d configs" % (hash_code,
+                                                                                                 len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 
     def get_simulation_inputs(self, hash_code, demand_identification, fleet_size=None, random_seed=None, **kwargs):
@@ -382,9 +424,13 @@ class PipelineConfig:
         if isinstance(random_seed, str):
             random_seed = int(random_seed)
 
-        inputs["vehicles"] = "%s/%d_%d_%d.xml" % (self.area_vehicles_files_location, fleet_size, simulation_config.services_parameters_values["vehicle_capacity"], random_seed)
+        inputs["vehicles"] = "%s/%d_%d_%d.xml" % (self.area_vehicles_files_location, fleet_size,
+                                                  simulation_config.services_parameters_values["vehicle_capacity"],
+                                                  random_seed)
 
-        inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario, simulation_config.services_parameters_values["price"])
+        inputs["cost_params"] = self.get_cost_parameters_file_path(simulation_config.deployment_scenario,
+                                                                   simulation_config.services_parameters_values[
+                                                                       "price"])
 
         transit_schedule = simulation_config.deployment_scenario.transit_schedule_override
 
@@ -394,8 +440,11 @@ class PipelineConfig:
             inputs["transit_schedule"] = self.area_simulation_input_file_path("transit_schedule.xml.gz")
 
         if not demand_identification:
-            inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
-            inputs["dvrp_travel_times"] = "%s/simulations/demand_identification/%s/%s/dvrp_travel_times.csv.gz" % (self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
+            inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path,
+                                                                                                  simulation_config.deployment_scenario.name,
+                                                                                                  simulation_config.demand_source)
+            inputs["dvrp_travel_times"] = "%s/simulations/demand_identification/%s/%s/dvrp_travel_times.csv.gz" % (
+                self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
             if transit_schedule is not None:
                 inputs["plans"] = "%s/plans.xml.gz" % self.get_modified_transit_schedule_location(transit_schedule)
@@ -413,9 +462,11 @@ class PipelineConfig:
         if detour_factor.endswith("%"):
             detour_factor_value += 100
             detour_factor_value /= 100
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeAlpha %f" % detour_factor_value)
+            args.append(
+                "--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxTravelTimeAlpha %f" % detour_factor_value)
         else:
-            args.append("--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxAbsoluteDetour %f" % detour_factor_value)
+            args.append(
+                "--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxAbsoluteDetour %f" % detour_factor_value)
 
         operational_scheme = simulation_config.services_parameters_values["operational_scheme"]
         if operational_scheme == "stop_based":
@@ -434,8 +485,10 @@ class PipelineConfig:
             args.append("--config:controller.lastIteration 0")
         return " ".join(args)
 
+
 class SimulationConfig:
-    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
+    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig,
+                 service_parameters_values: dict):
         self.deployment_scenario = deployment_scenario
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
