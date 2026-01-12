@@ -461,6 +461,8 @@ rule fleet_sizing:
     threads: 1
     resources:
         mem_mb=2048
+    params:
+        fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
     output:
         ["%s/simulations/evaluation/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
     run:
@@ -470,6 +472,8 @@ rule fleet_sizing:
         dest_dir_path = os.path.dirname(output[0])
         shutil.rmtree(dest_dir_path, ignore_errors=True)
         shutil.copytree(source_dir_path, dest_dir_path)
+        with open(os.path.join(dest_dir_path, "fleet_size.txt"), "w") as f:
+            f.write(params.fleet_size)
 
 
 rule simulation_summary:
@@ -484,6 +488,10 @@ rule simulation_summary:
         mem_mb=1024
     run:
         import yaml
+        import os
+        with open(os.path.join(os.path.dirname(output[0]), "fleet_size.txt")) as f:
+            fleet_size = int(f.read())
+        params.summary["fleet_size"] = fleet_size
         with open(output[0], "w") as f:
             yaml.dump(params.summary,  f, default_flow_style=False)
 
