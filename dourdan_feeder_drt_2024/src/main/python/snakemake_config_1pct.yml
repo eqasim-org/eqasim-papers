@@ -50,6 +50,7 @@ modified_transit_schedules:
 # Most parameters will always be the same for all considered services, but they can also be different (further increasing the set of simulations), one example here is the prebooking
 service_parameters:
   demand_impacting:
+    max_wait_time: ["600"]
     operational_scheme: ["stop_based", "door_to_door"]
     price: ["0.3", "0.6", "0.9"]
     detour_factor: ["+50%", "+1200s"] # Must begin with a + and end either with % or s

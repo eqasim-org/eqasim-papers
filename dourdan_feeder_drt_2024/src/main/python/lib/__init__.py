@@ -482,6 +482,10 @@ class PipelineConfig:
     def get_simulation_args(self, hash_code, demand_identification):
         simulation_config = self.hash_to_config(hash_code)
         args = list()
+        max_wait_time = int(simulation_config.services_parameters_values["max_wait_time"])
+        args.append(
+            "--config:multiModeDrt.drt[mode=drt].drtOptimizationConstraints[*=*].drtOptimizationConstraintsSet[*=*].maxWaitTime %d" % max_wait_time)
+
         detour_factor = simulation_config.services_parameters_values["detour_factor"]
         detour_factor_value = float(detour_factor[1:-1])
         if detour_factor.endswith("%"):
