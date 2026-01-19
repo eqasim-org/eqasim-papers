@@ -126,18 +126,13 @@ rule global_simulation_baseline:
         '''
 
 
-
-cut_config_path = config_object.area_baseline_config_path
-cut_network_path = config_object.area_simulation_input_file_path("network.xml.gz")
-cut_transit_schedule_path = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
-
 rule area_buffer:
     input:
-        config_object.general_inputs_config.area_path
+        lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).path
     output:
-        "%s/misc/%sarea_buffer.gpkg" % (config_object.output_path, config_object.general_inputs_config.area_prefix)
+        "%s/misc/{area_prefix}area_buffer.gpkg" % config_object.output_path
     params:
-        buffer_length=config_object.general_inputs_config.area_buffer_length
+        buffer_length=lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).buffer_length
     run:
         import geopandas as gpd
         gdf = gpd.read_file(input[0])
@@ -151,14 +146,16 @@ rule cutter:
         baseline_plans_path,
         baseline_events_path,
         baseline_travel_times_path,
-        "%s/misc/%sarea_buffer.gpkg" % (config_object.output_path, config_object.general_inputs_config.area_prefix)
+        "%s/misc/{area_prefix}area_buffer.gpkg" % config_object.output_path
     output:
-        cut_config_path,
-        cut_network_path,
-        cut_transit_schedule_path
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}config.xml" % config_object.output_path,
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}network.xml.gz" % config_object.output_path,
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     threads: config_object.cutter_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.cutter_resources.memory)
+    params:
+        output_dir=lambda wildcards: config_object.area_simulation_inputs_location(config_object.get_area_by_prefix(wildcards.area_prefix).id)
     shell:
         """
         {java_cmd} -cp "{input[0]}" -Xmx{config_object.cutter_resources.memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
@@ -166,10 +163,10 @@ rule cutter:
          --events-path={input[3]} \
          --vdf-travel-times-path={input[4]} \
          --extent-path={input[5]} \
-         --prefix={config_object.general_inputs_config.area_prefix} \
+         --prefix={wildcards.area_prefix} \
          --flag-area-link-modes=true  \
          --threads={config_object.cutter_resources.threads} \
-         --output-path={config_object.area_simulation_inputs_location} \
+         --output-path={params.output_dir} \
          --config:eqasim:vdf.writeInterval 0 \
          --config:eqasim:vdf.writeFlowInterval 0 \
          --config:eqasim:vdf.writeTravelTimesInterval 0 \
@@ -179,16 +176,18 @@ rule cutter:
 rule area_simulation_baseline:
     input:
         jar_path,
-        cut_config_path,
+        lambda wildcards: config_object.area_baseline_config_path(config_object.get_area_by_prefix(wildcards.area_prefix).id)
     output:
-        PipelineConfig.get_relevant_simulation_inputs(config_object.area_baseline_simulation_outputs_location)
+        ["%s/simulations/{area_prefix}baseline/%s" % (config_object.output_path, f) for f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     threads: config_object.area_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240
+    params:
+        output_dir=lambda wildcards: "%s/simulations/%sbaseline" % (config_object.output_path, wildcards.area_prefix)
     shell:
         '''
         {java_cmd} -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 -cp {jar_path} org.eqasim.ile_de_france.RunSimulation \
-        --config-path {cut_config_path} \
+        --config-path {input[1]} \
         --config:global.numberOfThreads {config_object.area_simulation_resources.threads} \
         --config:controller.outputDirectory {config_object.area_baseline_simulation_outputs_location} \
         --config:controller.lastIteration 100
@@ -197,9 +196,9 @@ rule area_simulation_baseline:
 rule drt_vehicles:
     input:
         jar_path,
-        cut_network_path
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}network.xml.gz" % config_object.output_path
     output:
-        "%s/{fleetSize}_{vehicleCapacity}_{seed}.xml" % config_object.area_vehicles_files_location
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}drt_vehicles/{fleetSize}_{vehicleCapacity}_{seed}.xml" % config_object.output_path
     resources:
         mem_mb=4096
     threads: 1
@@ -219,22 +218,21 @@ rule cost_params:
     params:
         cost_params=lambda wildcards: config_object.get_cost_params(wildcards.deployment_scenario, wildcards.price)
     output:
-        "%s/cost_parameters/{deployment_scenario}/{price}.yaml" % config_object.area_simulation_inputs_location
+        "%s/misc/cost_parameters/{deployment_scenario}/{price}.yaml" % config_object.output_path
     run:
         import yaml
         with open(output[0], "w") as f:
             yaml.dump(params.cost_params, f, default_flow_style=False)
 
-
 rule network_gpkg:
     input:
         jar_path=jar_path,
-        schedule_path=config_object.area_simulation_input_file_path("transit_schedule.xml.gz"),
-        network_path=config_object.area_simulation_input_file_path("network.xml.gz")
+        network_path="%s/scenarios/{area_prefix}scenario/{area_prefix}network.xml.gz" % config_object.output_path,
+        schedule_path="%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     params:
         crs="EPSG:2154"
     output:
-        "%s/misc/network.gpkg" % config_object.output_path
+        "%s/misc/{area_prefix}network.gpkg" % config_object.output_path
     threads: 1
     resources:
         mem_mb=2048
@@ -247,30 +245,30 @@ rule network_gpkg:
 
 rule modified_transit_schedule_lines:
     input:
-        schedule_gpkg="%s/misc/network.gpkg" % config_object.output_path,
-        legs=config_object.area_baseline_simulation_output_file_path("eqasim_legs.csv"),
-        pt_legs=config_object.area_baseline_simulation_output_file_path("eqasim_pt.csv"),
-        area=config_object.general_inputs_config.area_path
+        schedule_gpkg="%s/misc/{area_prefix}network.gpkg" % config_object.output_path,
+        legs="%s/simulations/{area_prefix}baseline/eqasim_legs.csv" % config_object.output_path,
+        pt_legs="%s/simulations/{area_prefix}baseline/eqasim_pt.csv" % config_object.output_path,
+        area=lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).path
     params:
         lambda wildcards: config_object.get_modified_transit_schedule_params(wildcards.schedule)
     threads: 1
     resources:
         mem_mb=4096
     output:
-        "%s/modified_transit_schedules/{schedule}/lines_to_remove.csv" % config_object.output_path
+        "%s/modified_transit_schedules/{schedule}/{area_prefix}lines_to_remove.csv" % config_object.output_path
     notebook:
         "notebooks/get_unused_buses.ipynb"
 
 rule modified_transit_schedule:
     input:
         jar = jar_path,
-        lines = "%s/modified_transit_schedules/{schedule}/lines_to_remove.csv" % config_object.output_path,
-        schedule = config_object.area_simulation_input_file_path("transit_schedule.xml.gz")
+        lines = "%s/modified_transit_schedules/{schedule}/{area_prefix}lines_to_remove.csv" % config_object.output_path,
+        schedule = "%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     threads: 1
     resources:
         mem_mb=2048
     output:
-        "%s/modified_transit_schedules/{schedule}/transit_schedule.xml.gz" % config_object.output_path
+        "%s/modified_transit_schedules/{schedule}/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     shell:
         """
         {java_cmd} -Xmx2G -cp {input.jar}  org.eqasim.papers.dourdan_feeder_drt_2024.RemoveTransitLines \
@@ -281,14 +279,14 @@ rule modified_transit_schedule:
 rule modified_transit_schedule_plans:
     input:
         jar = jar_path,
-        schedule = "%s/modified_transit_schedules/{schedule}/transit_schedule.xml.gz" % config_object.output_path,
-        config = config_object.area_baseline_config_path,
-        plans = config_object.area_baseline_simulation_output_file_path("output_plans.xml.gz")
+        schedule = "%s/modified_transit_schedules/{schedule}/{area_prefix}transit_schedule.xml.gz" % config_object.output_path,
+        config = lambda wildcards: config_object.area_baseline_config_path(config_object.get_area_by_prefix(wildcards.area_prefix).id),
+        plans = lambda wildcards: config_object.area_baseline_simulation_output_file_path(config_object.get_area_by_prefix(wildcards.area_prefix).id, "output_plans.xml.gz")
     threads: config_object.area_routing_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_routing_resources.memory)
     output:
-        "%s/modified_transit_schedules/{schedule}/plans.xml.gz" % config_object.output_path
+        "%s/modified_transit_schedules/{schedule}/{area_prefix}plans.xml.gz" % config_object.output_path
     shell:
         """
         {java_cmd} -Xmx{config_object.area_routing_resources.memory} -cp {input.jar} \
@@ -302,14 +300,14 @@ rule modified_transit_schedule_plans:
 rule drt_stops:
     input:
         jar_path,
-        config_object.general_inputs_config.area_path,
-        cut_transit_schedule_path,
-        cut_network_path
+        lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).path,
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path,
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}network.xml.gz" % config_object.output_path,
     threads: 1
     resources:
         mem_mb=2048
     output:
-        config_object.area_simulation_input_file_path("drt_stops.xml")
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}drt_stops.xml" % config_object.output_path
     shell:
         """
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.TransitScheduleToDrtStops \
@@ -320,14 +318,14 @@ rule drt_stops:
 
 rule deployment_scenario_config:
     input:
-        lambda wildcards: [jar_path] + config_object.get_deployment_scenario_configure_inputs(wildcards.deployment_scenario)
+        lambda wildcards: [jar_path] + config_object.get_deployment_scenario_configure_inputs(config_object.get_area_by_prefix(wildcards.area_prefix).id, wildcards.deployment_scenario)
     output:
-        "%s/%sconfig_{deployment_scenario}.xml" % (config_object.area_simulation_inputs_location, config_object.general_inputs_config.area_prefix)
+        "%s/scenarios/{area_prefix}scenario/{area_prefix}config_{deployment_scenario}.xml" % config_object.output_path
     threads: 1
     resources:
         mem_mb=2048
     params:
-        args=lambda wildcards: config_object.get_deployment_scenario_configure_args(wildcards.deployment_scenario)
+        args=lambda wildcards: config_object.get_deployment_scenario_configure_args(wildcards.deployment_scenario, config_object.get_area_by_prefix(wildcards.area_prefix).id)
     shell:
         """
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
@@ -342,16 +340,16 @@ rule deployment_scenario_config:
 
 rule demand_identification_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=True, jar_path=jar_path))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.area_id, wildcards.hash, demand_identification=True, jar_path=jar_path))
     output:
-        ["%s/simulations/demand_identification/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
-        "%s/simulations/demand_identification/{group}/{hash}/dvrp_travel_times.csv.gz" % (config_object.output_path)
+        ["%s/simulations/demand_identification/{area_id}/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
+        "%s/simulations/demand_identification/{area_id}/{group}/{hash}/dvrp_travel_times.csv.gz" % config_object.output_path
     threads: config_object.area_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240,
         runtime=config_object.area_simulation_resources.runtime
     params:
-        output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash),
+        output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash),
         args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
     shell:
         """
@@ -367,11 +365,11 @@ rule demand_identification_simulation:
 
 rule fleet_sizing_simulation:
     input:
-        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.hash, demand_identification=False, fleet_size=wildcards.fleet_size, random_seed=wildcards.seed, jar_path=jar_path))
+        unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.area_id, wildcards.hash, demand_identification=False, fleet_size=wildcards.fleet_size, random_seed=wildcards.seed, jar_path=jar_path))
     output:
-        ["%s/simulations/fleet_sizing/{group}/{hash}/{fleet_size}/seeds/{seed}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
+        ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/{seed}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
     params:
-        output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
+        output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
         args = lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False)
     threads: config_object.area_simulation_resources.threads
     resources:
@@ -398,9 +396,9 @@ def get_rejection_rate(sim_path):
 
 checkpoint fleet_size_evaluation:
     input:
-        [["%s/simulations/fleet_sizing/{group}/{hash}/{fleet_size}/seeds/%d/%s" % (config_object.output_path, seed, sim_output) for seed in config_object.fleet_sizing_config.fleet_seeds] for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        [["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/%d/%s" % (config_object.output_path, seed, sim_output) for seed in config_object.fleet_sizing_config.fleet_seeds] for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     output:
-        ["%s/simulations/fleet_sizing/{group}/{hash}/{fleet_size}/best/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     resources:
         mem_mb=2048
     threads: 1
@@ -434,14 +432,14 @@ def get_cached_checkpoint_rejection_rate(**wildcards):
 
 def fleet_sizing_input(wildcards):
     left = int(config_object.fleet_sizing_config.fleet_size_precision)
-    left_checkpoint = checkpoints.fleet_size_evaluation.get(group=wildcards.group, hash=wildcards.hash, fleet_size=left)
+    left_checkpoint = checkpoints.fleet_size_evaluation.get(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=left)
     left_rejection_rate = get_rejection_rate(os.path.dirname(left_checkpoint.output[0]))
 
     if left_rejection_rate <= float(config_object.fleet_sizing_config.max_rejection_rate):
         return left_checkpoint.output[0]
     right = left * 10
     while True:
-        right_output, right_value = get_cached_checkpoint_rejection_rate(group=wildcards.group, hash=wildcards.hash, fleet_size=right)
+        right_output, right_value = get_cached_checkpoint_rejection_rate(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=right)
         if right_value > float(config_object.fleet_sizing_config.max_rejection_rate):
             left = right
             right *= 2
@@ -452,7 +450,7 @@ def fleet_sizing_input(wildcards):
 
     while right - left > int(config_object.fleet_sizing_config.fleet_size_precision):
         middle = int( (right + left) / 2)
-        middle_output, middle_value = get_cached_checkpoint_rejection_rate(group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
+        middle_output, middle_value = get_cached_checkpoint_rejection_rate(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
         if middle_value < float(config_object.fleet_sizing_config.max_rejection_rate):
             right = middle
             right_output = middle_output
@@ -470,7 +468,7 @@ rule fleet_sizing:
     params:
         fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
     output:
-        ["%s/simulations/evaluation/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
+        ["%s/simulations/evaluation/{area_id}/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
     run:
         import shutil
         import os
@@ -486,7 +484,7 @@ rule simulation_summary:
     input:
         lambda wildcards: ["%s/simulations/evaluation/%s/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     output:
-        "%s/simulations/evaluation/{group}/{hash}/summary.yaml" % config_object.output_path
+        "%s/simulations/evaluation/{area_id}/{group}/{hash}/summary.yaml" % config_object.output_path
     params:
         summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
     threads: 1
@@ -505,9 +503,4 @@ rule simulation_summary:
 rule all:
     default_target: True
     input:
-        baseline_trips_path,
-        config_object.area_baseline_simulation_output_file_path("eqasim_trips.csv"),
-        [config_object.get_modified_transit_schedule_path(modified_transit_schedule) for modified_transit_schedule in config_object.modified_transit_schedules.values()],
-        [config_object.get_deployment_scenario_config_path(deployment_scenario) for deployment_scenario in config_object.deployment_scenarios.values()],
-        ["%s/simulations/evaluation/%s/%s/output_plans.xml.gz" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
-        ["%s/simulations/evaluation/%s/%s/summary.yaml" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()]
+        expand(["%s/simulations/evaluation/{area_id}/%s/%s/output_plans.xml.gz" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()], area_id=list(config_object.area_configs.keys())),

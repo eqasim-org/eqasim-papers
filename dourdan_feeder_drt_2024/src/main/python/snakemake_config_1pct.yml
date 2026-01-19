@@ -21,10 +21,13 @@ resources:
 general_inputs:
   input_path: "inputs/simulation_inputs_1pct"
   input_prefix: "ile_de_france_"
-  area_prefix: "drn_"
-  area_path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
-  area_buffer_length: 5000 # We do not cut the scenario strictly on the operating area, we add a buffer to allow vehicles to travel on links that are not necessarily inside the area
   sampling: 0.01
+
+areas:
+  drn:
+    prefix: "drn_"
+    path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
+    buffer_length: 5000 # We do not cut the scenario strictly on the operating area, we add a buffer to allow vehicles to travel on links that are not necessarily inside the area
 
 
 # Modified transit schedules are defined by removing transit lines from the original schedule

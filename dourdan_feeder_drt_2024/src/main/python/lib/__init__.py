@@ -176,15 +176,20 @@ class DeploymentScenario:
         return set(s.type for s in self.services.values())
 
 
+class AreaConfig:
+    def __init__(self, area_id, config_dict, basedir):
+        self.id = area_id
+        self.path = to_absolute(config_dict["path"], basedir)
+        self.prefix = config_dict["prefix"]
+        self.buffer_length = int(config_dict["buffer_length"])
+        assert self.prefix != "global_"
+
+
 class GeneralInputsConfig:
     def __init__(self, config_dict, basedir):
         self.input_path = to_absolute(config_dict["input_path"], basedir)
         self.input_prefix = config_dict["input_prefix"]
-        self.area_path = to_absolute(config_dict["area_path"], basedir)
-        self.area_prefix = config_dict["area_prefix"]
-        self.area_buffer_length = int(config_dict["area_buffer_length"])
         self.sampling = config_dict["sampling"]
-        assert self.area_prefix != "global_"
 
 
 def dctproduct(dct):
@@ -212,6 +217,8 @@ class PipelineConfig:
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
         self.area_routing_resources = ResourcesConfig(config_dict["resources"]["area_routing"], max_cores)
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
+        self.area_configs = {area_id: AreaConfig(area_id, area_config_dict, basedir) for area_id, area_config_dict in
+                             config_dict["areas"].items()}
         self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in
                                            config_dict["modified_transit_schedules"].items()}
         self.service_parameters_config = ServiceParametersConfig(config_dict["service_parameters"])
@@ -221,11 +228,22 @@ class PipelineConfig:
             key: DeploymentScenario(key, value, self.services_config, self.modified_transit_schedules) for key, value in
             config_dict["deployment_scenarios"].items()}
 
+        # Todo check area prefix unicity
+
         self.simulation_configs = dict()
         for deployment_scenario in self.deployment_scenarios.values():
             new_configs = self.get_deployment_scenario_simulation_configs(deployment_scenario)
             assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
             self.simulation_configs.update(new_configs)
+
+    def get_area_config(self, area_id):
+        return self.area_configs[area_id]
+
+    def get_area_by_prefix(self, area_prefix):
+        for area_config in self.area_configs.values():
+            if area_config.prefix == area_prefix:
+                return area_config
+        return None
 
     @staticmethod
     def get_relevant_simulation_inputs(base_path):
@@ -250,41 +268,41 @@ class PipelineConfig:
     def global_simulation_output_file_path(self, file_name):
         return os.path.join(self.global_simulation_outputs_location, file_name)
 
-    @property
-    def area_simulation_inputs_location(self):
-        return os.path.join(self.output_path, "scenarios", "%sscenario" % self.general_inputs_config.area_prefix)
+    def area_simulation_inputs_location(self, area_id):
+        area_config = self.get_area_config(area_id)
+        return os.path.join(self.output_path, "scenarios", "%sscenario" % area_config.prefix)
 
-    def area_simulation_input_file_path(self, file_name):
-        return os.path.join(self.area_simulation_inputs_location,
-                            "%s%s" % (self.general_inputs_config.area_prefix, file_name))
+    def area_simulation_input_file_path(self, area_id, file_name):
+        area_config = self.get_area_config(area_id)
+        return os.path.join(self.area_simulation_inputs_location(area_id),
+                            "%s%s" % (area_config.prefix, file_name))
 
-    @property
-    def area_baseline_config_path(self):
-        return self.area_simulation_input_file_path("config.xml")
+    def area_baseline_config_path(self, area_id):
+        return self.area_simulation_input_file_path(area_id, "config.xml")
 
-    @property
-    def area_baseline_simulation_outputs_location(self):
-        return os.path.join(self.output_path, "simulations", "%sbaseline" % self.general_inputs_config.area_prefix)
+    def area_baseline_simulation_outputs_location(self, area_id):
+        area_config = self.get_area_config(area_id)
+        return os.path.join(self.output_path, "simulations", "%sbaseline" % area_config.prefix)
 
-    def area_baseline_simulation_output_file_path(self, file_name):
-        return os.path.join(self.area_baseline_simulation_outputs_location, file_name)
+    def area_baseline_simulation_output_file_path(self, area_id, file_name):
+        return os.path.join(self.area_baseline_simulation_outputs_location(area_id), file_name)
 
-    @property
-    def area_vehicles_files_location(self):
-        return self.area_simulation_input_file_path("drt_vehicles")
+    def area_vehicles_files_location(self, area_id):
+        return self.area_simulation_input_file_path(area_id, "drt_vehicles")
 
-    def area_vehicles_file_path(self, fleet_size: int, vehicle_capacity: int):
+    def area_vehicles_file_path(self, area_id: str, fleet_size: int, vehicle_capacity: int):
         file_name = "%d_%d.xml" % (fleet_size, vehicle_capacity)
-        return os.path.join(self.area_vehicles_files_location, file_name)
+        return os.path.join(self.area_vehicles_files_location(area_id), file_name)
 
     def get_modified_transit_schedule_location(self, modified_transit_schedule):
         if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
             modified_transit_schedule = self.modified_transit_schedules[modified_transit_schedule]
         return os.path.join(self.output_path, "modified_transit_schedules", modified_transit_schedule.name)
 
-    def get_modified_transit_schedule_path(self, modified_transit_schedule):
+    def get_modified_transit_schedule_path(self, modified_transit_schedule, area_id):
+        area_config = self.get_area_config(area_id)
         return os.path.join(str(self.get_modified_transit_schedule_location(modified_transit_schedule)),
-                            "transit_schedule.xml.gz")
+                            "%stransit_schedule.xml.gz" % area_config.prefix)
 
     def get_modified_transit_schedule_params(self, modified_transit_schedule):
         if not isinstance(modified_transit_schedule, ModifiedTransitScheduleConfig):
@@ -297,16 +315,16 @@ class PipelineConfig:
         params["sampling"] = self.general_inputs_config.sampling
         return params
 
-    def get_deployment_scenario_config_path(self, deployment_scenario):
+    def get_deployment_scenario_config_path(self, area_id, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        return self.area_simulation_input_file_path("config_%s.xml" % deployment_scenario.name)
+        return self.area_simulation_input_file_path(area_id, "config_%s.xml" % deployment_scenario.name)
 
     def get_cost_parameters_file_path(self, deployment_scenario, unitary_cost):
         assert isinstance(unitary_cost, str)
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        return os.path.join(self.area_simulation_inputs_location, "cost_parameters", deployment_scenario.name,
+        return os.path.join(self.output_path, "misc", "cost_parameters", deployment_scenario.name,
                             "%s.yaml" % unitary_cost)
 
     def get_cost_params(self, deployment_scenario, unitary_cost):
@@ -327,19 +345,22 @@ class PipelineConfig:
             params["feederDrtCost_EUR_km"] = float(unitary_cost)
         return params
 
-    def get_deployment_scenario_configure_inputs(self, deployment_scenario):
+    def get_deployment_scenario_configure_inputs(self, area_id, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
-        inputs = [self.area_baseline_config_path, self.area_simulation_input_file_path("drt_stops.xml"),
-                  self.general_inputs_config.area_path]
+        area_config = self.get_area_config(area_id)
+        inputs = [self.area_baseline_config_path(area_id),
+                  self.area_simulation_input_file_path(area_id, "drt_stops.xml"),
+                  area_config.path]
         transit_schedule_override = deployment_scenario.transit_schedule_override
         if transit_schedule_override is not None:
-            inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override))
+            inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override, area_id))
             inputs.append(os.path.join(str(self.get_modified_transit_schedule_location(transit_schedule_override)),
-                                       "plans.xml.gz"))
+                                       "%splans.xml.gz" % area_config.prefix))
         return inputs
 
-    def get_deployment_scenario_configure_args(self, deployment_scenario):
+    def get_deployment_scenario_configure_args(self, deployment_scenario, area_id):
+        area_config = self.get_area_config(area_id)
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
         result = []
@@ -358,9 +379,9 @@ class PipelineConfig:
         for key, value in deployment_scenario.simulation_overrides.items():
             if key == "transit_schedule":
                 result.append(
-                    "--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value))
+                    "--config:transit.transitScheduleFile %s" % self.get_modified_transit_schedule_path(value, area_id))
                 result.append("--config:plans.inputPlansFile %s" % os.path.join(
-                    str(self.get_modified_transit_schedule_location(value)), "plans.xml.gz"))
+                    str(self.get_modified_transit_schedule_location(value)), "%splans.xml.gz" % area_config.prefix))
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
         result.append("--config:controller.outputDirectory %s" % deployment_scenario.name)
@@ -408,9 +429,11 @@ class PipelineConfig:
                                                                                                  len(self.simulation_configs)))
         return self.simulation_configs[hash_code]
 
-    def get_simulation_inputs(self, hash_code, demand_identification, fleet_size=None, random_seed=None, **kwargs):
+    def get_simulation_inputs(self, area_id, hash_code, demand_identification, fleet_size=None, random_seed=None,
+                              **kwargs):
+        area_config = self.get_area_config(area_id)
         simulation_config = self.hash_to_config(hash_code)
-        inputs = dict(config=self.get_deployment_scenario_config_path(simulation_config.deployment_scenario))
+        inputs = dict(config=self.get_deployment_scenario_config_path(area_id, simulation_config.deployment_scenario))
 
         if demand_identification:
             assert fleet_size is None and random_seed is None
@@ -424,7 +447,7 @@ class PipelineConfig:
         if isinstance(random_seed, str):
             random_seed = int(random_seed)
 
-        inputs["vehicles"] = "%s/%d_%d_%d.xml" % (self.area_vehicles_files_location, fleet_size,
+        inputs["vehicles"] = "%s/%d_%d_%d.xml" % (self.area_vehicles_files_location(area_id), fleet_size,
                                                   simulation_config.services_parameters_values["vehicle_capacity"],
                                                   random_seed)
 
@@ -435,21 +458,23 @@ class PipelineConfig:
         transit_schedule = simulation_config.deployment_scenario.transit_schedule_override
 
         if transit_schedule is not None:
-            inputs["transit_schedule"] = self.get_modified_transit_schedule_path(transit_schedule)
+            inputs["transit_schedule"] = self.get_modified_transit_schedule_path(transit_schedule, area_id)
         else:
-            inputs["transit_schedule"] = self.area_simulation_input_file_path("transit_schedule.xml.gz")
+            inputs["transit_schedule"] = self.area_simulation_input_file_path(area_id, "transit_schedule.xml.gz")
 
         if not demand_identification:
-            inputs["plans"] = "%s/simulations/demand_identification/%s/%s/output_plans.xml.gz" % (self.output_path,
-                                                                                                  simulation_config.deployment_scenario.name,
-                                                                                                  simulation_config.demand_source)
-            inputs["dvrp_travel_times"] = "%s/simulations/demand_identification/%s/%s/dvrp_travel_times.csv.gz" % (
-                self.output_path, simulation_config.deployment_scenario.name, simulation_config.demand_source)
+            inputs["plans"] = "%s/simulations/demand_identification/%s/%s/%s/output_plans.xml.gz" % (self.output_path,
+                                                                                                     area_id,
+                                                                                                     simulation_config.deployment_scenario.name,
+                                                                                                     simulation_config.demand_source)
+            inputs["dvrp_travel_times"] = "%s/simulations/demand_identification/%s/%s/%s/dvrp_travel_times.csv.gz" % (
+                self.output_path, area_id, simulation_config.deployment_scenario.name, simulation_config.demand_source)
         else:
             if transit_schedule is not None:
-                inputs["plans"] = "%s/plans.xml.gz" % self.get_modified_transit_schedule_location(transit_schedule)
+                inputs["plans"] = "%s/%splans.xml.gz" % (self.get_modified_transit_schedule_location(transit_schedule),
+                                                         area_config.prefix)
             else:
-                inputs["plans"] = self.area_baseline_simulation_output_file_path("output_plans.xml.gz")
+                inputs["plans"] = self.area_baseline_simulation_output_file_path(area_id, "output_plans.xml.gz")
 
         inputs.update(kwargs)
         return inputs

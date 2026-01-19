@@ -20,11 +20,13 @@ resources:
 general_inputs:
   input_path: "inputs/simulation_inputs"
   input_prefix: "ile_de_france_"
-  area_prefix: "drn_"
-  area_path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
-  area_buffer_length: 5000 # We do not cut the scenario strictly on the operating area, we add a buffer to allow vehicles to travel on links that are not necessarily inside the area
   sampling: 0.25
 
+areas:
+  drn:
+    prefix: "drn_"
+    path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
+    buffer_length: 5000 # We do not cut the scenario strictly on the operating area, we add a buffer to allow vehicles to travel on links that are not necessarily inside the area
 
 # Modified transit schedules are defined by removing transit lines from the original schedule
 # The lines to remove are based on a usage criteria as observed in the baseline simulation (after cutting)
@@ -99,8 +101,10 @@ deployment_scenarios:
 # Fleet sizing is handled differently because we aim at finding the minimal fleet size that achieves a rejection rate below a thershold
 fleet_sizing:
   demand_identification_fleet_size: 10 # This fleet size will be used in the demand identification simulations, must be part of the list below
-  fleet_sizes: [10, 20, 30, 50]
+  fleet_seeds: 10
   max_rejection_rate: "0.05"
+  fleet_size_precision: 5
+  max_fleet_size: 6400
 
 output_path: "output"
 temp_path: "temp"
