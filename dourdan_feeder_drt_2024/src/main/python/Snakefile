@@ -421,14 +421,6 @@ checkpoint fleet_size_evaluation:
         shutil.copytree(selected_dir, dest_dir)
 
 
-checkpoint_rejection_rate_cache = dict()
-
-def get_cached_checkpoint_rejection_rate(**wildcards):
-    output_path = checkpoints.fleet_size_evaluation.get(**wildcards).output[0]
-    if output_path not in checkpoint_rejection_rate_cache:
-        checkpoint_rejection_rate_cache[output_path] = get_rejection_rate(os.path.dirname(output_path))
-    return output_path, checkpoint_rejection_rate_cache[output_path]
-
 
 def fleet_sizing_input(wildcards):
     left = int(config_object.fleet_sizing_config.fleet_size_precision)
@@ -439,24 +431,26 @@ def fleet_sizing_input(wildcards):
         return left_checkpoint.output[0]
     right = left * 10
     while True:
-        right_output, right_value = get_cached_checkpoint_rejection_rate(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=right)
+        right_checkpoint = checkpoints.fleet_size_evaluation.get(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=right)
+        right_value = get_rejection_rate(os.path.dirname(right_checkpoint.output[0]))
         if right_value > float(config_object.fleet_sizing_config.max_rejection_rate):
             left = right
             right *= 2
         else:
             break
         if config_object.fleet_sizing_config.max_fleet_size is not None and config_object.fleet_sizing_config.max_fleet_size < right:
-            return right_output
+            return right_checkpoint.output[0]
 
     while right - left > int(config_object.fleet_sizing_config.fleet_size_precision):
         middle = int( (right + left) / 2)
-        middle_output, middle_value = get_cached_checkpoint_rejection_rate(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
+        middle_checkpoint = checkpoints.fleet_size_evaluation.get(area_id=wildcards.area_id, group=wildcards.group, hash=wildcards.hash, fleet_size=middle)
+        middle_value = get_rejection_rate(os.path.dirname(middle_checkpoint.output[0]))
         if middle_value < float(config_object.fleet_sizing_config.max_rejection_rate):
             right = middle
-            right_output = middle_output
+            right_checkpoint = middle_checkpoint
         else:
             left = middle
-    return right_output
+    return right_checkpoint.output[0]
 
 
 rule fleet_sizing:

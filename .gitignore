@@ -9,6 +9,10 @@ target/
 *.iml
 *.ipr
 
+
+# Pycache folders
+*/__pycache__/*
+
 ### Eclipse ###
 .apt_generated
 .classpath
