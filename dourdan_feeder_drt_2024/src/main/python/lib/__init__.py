@@ -182,7 +182,7 @@ class AreaConfig:
         self.path = to_absolute(config_dict["path"], basedir)
         self.prefix = config_dict["prefix"]
         self.buffer_length = int(config_dict["buffer_length"])
-        assert self.prefix != "global_"
+        assert not self.prefix.startswith("g")
 
 
 class GeneralInputsConfig:

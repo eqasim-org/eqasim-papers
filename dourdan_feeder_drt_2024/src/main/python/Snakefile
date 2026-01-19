@@ -172,6 +172,8 @@ rule cutter:
          --config:eqasim:vdf.writeTravelTimesInterval 0 \
         """
 
+wildcard_constraints:
+    area_prefix="[^g].+"
 
 rule area_simulation_baseline:
     input:
