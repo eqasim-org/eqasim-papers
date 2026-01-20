@@ -219,7 +219,7 @@ class PipelineConfig:
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
         self.area_configs = {area_id: AreaConfig(area_id, area_config_dict, basedir) for area_id, area_config_dict in
                              config_dict["areas"].items()}
-        if "modified_transit_schedule" in config_dict:
+        if "modified_transit_schedules" in config_dict:
             self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in
                                                config_dict["modified_transit_schedules"].items()}
         else:
