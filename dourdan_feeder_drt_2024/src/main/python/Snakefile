@@ -36,7 +36,7 @@ mvn_cmd = config_object.java.mvn_cmd
 
 # Basic input simulation files related file paths
 
-original_simulation_files_paths = [os.path.join(config_object.general_inputs_config.input_path, f) for f in os.listdir(config_object.general_inputs_config.input_path)]
+original_simulation_files_paths = [to_absolute(os.path.join(config_object.general_inputs_config.input_path, f), workflow.basedir) for f in os.listdir(config_object.general_inputs_config.input_path)]
 
 # The locations of the files that input files after they will be copied
 simulation_files_paths = [os.path.join(config_object.global_simulation_inputs_location, f) for f in os.listdir(config_object.general_inputs_config.input_path)]
