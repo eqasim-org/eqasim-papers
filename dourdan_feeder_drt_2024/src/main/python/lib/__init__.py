@@ -219,8 +219,11 @@ class PipelineConfig:
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
         self.area_configs = {area_id: AreaConfig(area_id, area_config_dict, basedir) for area_id, area_config_dict in
                              config_dict["areas"].items()}
-        self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in
-                                           config_dict["modified_transit_schedules"].items()}
+        if "modified_transit_schedule" in config_dict:
+            self.modified_transit_schedules = {key: ModifiedTransitScheduleConfig(key, value) for key, value in
+                                               config_dict["modified_transit_schedules"].items()}
+        else:
+            self.modified_transit_schedules = dict()
         self.service_parameters_config = ServiceParametersConfig(config_dict["service_parameters"])
         self.services_config = {key: SingleServiceConfig(key, value) for key, value in config_dict["services"].items()}
         self.fleet_sizing_config = FleetSizingConfig(config_dict["fleet_sizing"], self.random_seed)
