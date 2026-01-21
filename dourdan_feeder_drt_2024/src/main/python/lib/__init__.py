@@ -399,6 +399,17 @@ class PipelineConfig:
         if "intermodal" in deployment_scenario.service_types:
             result.append("--config:eqasim.estimator[mode=feeder_drt].estimator DefaultFeederDrtUtilityEstimator")
         result.append("--config:controller.outputDirectory %s" % deployment_scenario.name)
+
+        # We add drt stops as a dependency only if we actually want to simulate a stop_based service
+        added_drt_stops = False
+        for container in [self.service_parameters_config.demand_impacting_params,
+                          self.service_parameters_config.non_demand_impacting_params]:
+            for service_parameter in container.values():
+                if service_parameter.name == "operational_scheme" and "stop_based" in service_parameter.values:
+                    result.append("----config:multiModeDrt.drt[mode=drt].transitStopFile " + self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
+                    break
+            if added_drt_stops:
+                break
         return " ".join(result)
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):

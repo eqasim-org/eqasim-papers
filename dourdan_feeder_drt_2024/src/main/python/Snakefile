@@ -332,9 +332,8 @@ rule deployment_scenario_config:
         """
         {java_cmd} -Xmx2G -cp {input[0]} org.eqasim.papers.dourdan_feeder_drt_2024.ConfigureDrtServices \
         --input-path {input[1]} --output-path {output[0]} \
-        --config:multiModeDrt.drt[mode=drt].transitStopFile {input[2]} \
         --config:multiModeDrt.drt[mode=drt].operationalScheme serviceAreaBased \
-        --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[3]} \
+        --config:multiModeDrt.drt[mode=drt].drtServiceAreaShapeFile {input[2]} \
         --config:eqasim.estimator[mode=drt].estimator DrtUtilityEstimator \
         --config:dvrp.networkModes inside_car \
         {params.args}
