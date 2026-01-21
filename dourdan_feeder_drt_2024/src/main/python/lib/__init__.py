@@ -353,13 +353,24 @@ class PipelineConfig:
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
         area_config = self.get_area_config(area_id)
         inputs = [self.area_baseline_config_path(area_id),
-                  self.area_simulation_input_file_path(area_id, "drt_stops.xml"),
                   area_config.path]
+
+        # We add drt stops as a dependency only if we actually want to simulate a stop_based service
+        added_drt_stops = False
+        for container in [self.service_parameters_config.demand_impacting_params, self.service_parameters_config.non_demand_impacting_params]:
+            for service_parameter in container.values():
+                if service_parameter.name == "operational_scheme" and "stop_based" in service_parameter.values:
+                    inputs.append(self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
+                    break
+            if added_drt_stops:
+                break
+
         transit_schedule_override = deployment_scenario.transit_schedule_override
         if transit_schedule_override is not None:
             inputs.append(self.get_modified_transit_schedule_path(transit_schedule_override, area_id))
             inputs.append(os.path.join(str(self.get_modified_transit_schedule_location(transit_schedule_override)),
                                        "%splans.xml.gz" % area_config.prefix))
+
         return inputs
 
     def get_deployment_scenario_configure_args(self, deployment_scenario, area_id):
