@@ -116,7 +116,8 @@ rule global_simulation_baseline:
         baseline_travel_times_path
     threads: config_object.global_simulation_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory)
+        mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory),
+        runtime=config_object.global_simulation_resources.runtime
     shell:
         '''
         {java_cmd} -cp "{jar_path}" -Xmx{config_object.global_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
@@ -132,7 +133,8 @@ rule area_buffer:
     output:
         "%s/misc/{area_prefix}area_buffer.gpkg" % config_object.output_path
     params:
-        buffer_length=lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).buffer_length
+        buffer_length=lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).buffer_length,
+        runtime=5
     run:
         import geopandas as gpd
         gdf = gpd.read_file(input[0])
@@ -153,7 +155,8 @@ rule cutter:
         "%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     threads: config_object.cutter_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.cutter_resources.memory)
+        mem_mb=memory_string_to_mb(config_object.cutter_resources.memory),
+        runtime=config_object.cutter_resources.runtime
     params:
         output_dir=lambda wildcards: config_object.area_simulation_inputs_location(config_object.get_area_by_prefix(wildcards.area_prefix).id)
     shell:
@@ -181,16 +184,17 @@ rule area_simulation_baseline:
         lambda wildcards: config_object.area_baseline_config_path(config_object.get_area_by_prefix(wildcards.area_prefix).id)
     output:
         ["%s/simulations/{area_prefix}baseline/%s" % (config_object.output_path, f) for f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
-    threads: config_object.area_simulation_resources.threads
+    threads: config_object.area_baseline_simulation_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240
+        mem_mb=memory_string_to_mb(config_object.area_baseline_simulation_resources.memory) + 10240,
+        runtime=config_object.area_baseline_simulation_resources.runtime
     params:
         output_dir=lambda wildcards: "%s/simulations/%sbaseline" % (config_object.output_path, wildcards.area_prefix)
     shell:
         '''
-        {java_cmd} -Xmx{config_object.area_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 -cp {jar_path} org.eqasim.ile_de_france.RunSimulation \
+        {java_cmd} -Xmx{config_object.area_baseline_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 -cp {jar_path} org.eqasim.ile_de_france.RunSimulation \
         --config-path {input[1]} \
-        --config:global.numberOfThreads {config_object.area_simulation_resources.threads} \
+        --config:global.numberOfThreads {config_object.area_baseline_simulation_resources.threads} \
         --config:controller.outputDirectory {params.output_dir} \
         --config:controller.lastIteration 100
         '''
@@ -202,7 +206,8 @@ rule drt_vehicles:
     output:
         "%s/scenarios/{area_prefix}scenario/{area_prefix}drt_vehicles/{fleetSize}_{vehicleCapacity}_{seed}.xml" % config_object.output_path
     resources:
-        mem_mb=4096
+        mem_mb=4096,
+        runtime=20
     threads: 1
     shell:
         '''
@@ -219,6 +224,8 @@ rule drt_vehicles:
 rule cost_params:
     params:
         cost_params=lambda wildcards: config_object.get_cost_params(wildcards.deployment_scenario, wildcards.price)
+    resources:
+        runtime=1
     output:
         "%s/misc/cost_parameters/{deployment_scenario}/{price}.yaml" % config_object.output_path
     run:
@@ -237,7 +244,8 @@ rule network_gpkg:
         "%s/misc/{area_prefix}network.gpkg" % config_object.output_path
     threads: 1
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=30
     shell:
         """
         {java_cmd} -Xmx2G -cp {input.jar_path} org.eqasim.core.tools.ExportTransitLinesToGeopackage \
@@ -255,7 +263,8 @@ rule modified_transit_schedule_lines:
         lambda wildcards: config_object.get_modified_transit_schedule_params(wildcards.schedule)
     threads: 1
     resources:
-        mem_mb=4096
+        mem_mb=4096,
+        runtime=30
     output:
         "%s/modified_transit_schedules/{schedule}/{area_prefix}lines_to_remove.csv" % config_object.output_path
     notebook:
@@ -268,7 +277,8 @@ rule modified_transit_schedule:
         schedule = "%s/scenarios/{area_prefix}scenario/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     threads: 1
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=30,
     output:
         "%s/modified_transit_schedules/{schedule}/{area_prefix}transit_schedule.xml.gz" % config_object.output_path
     shell:
@@ -286,7 +296,8 @@ rule modified_transit_schedule_plans:
         plans = lambda wildcards: config_object.area_baseline_simulation_output_file_path(config_object.get_area_by_prefix(wildcards.area_prefix).id, "output_plans.xml.gz")
     threads: config_object.area_routing_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.area_routing_resources.memory)
+        mem_mb=memory_string_to_mb(config_object.area_routing_resources.memory),
+        runtime=config_object.area_routing_resources.runtime
     output:
         "%s/modified_transit_schedules/{schedule}/{area_prefix}plans.xml.gz" % config_object.output_path
     shell:
@@ -307,7 +318,8 @@ rule drt_stops:
         "%s/scenarios/{area_prefix}scenario/{area_prefix}network.xml.gz" % config_object.output_path,
     threads: 1
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=30
     output:
         "%s/scenarios/{area_prefix}scenario/{area_prefix}drt_stops.xml" % config_object.output_path
     shell:
@@ -325,7 +337,8 @@ rule deployment_scenario_config:
         "%s/scenarios/{area_prefix}scenario/{area_prefix}config_{deployment_scenario}.xml" % config_object.output_path
     threads: 1
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=5
     params:
         args=lambda wildcards: config_object.get_deployment_scenario_configure_args(wildcards.deployment_scenario, config_object.get_area_by_prefix(wildcards.area_prefix).id)
     shell:
@@ -345,16 +358,16 @@ rule demand_identification_simulation:
     output:
         ["%s/simulations/demand_identification/{area_id}/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
         "%s/simulations/demand_identification/{area_id}/{group}/{hash}/dvrp_travel_times.csv.gz" % config_object.output_path
-    threads: config_object.area_simulation_resources.threads
+    threads: config_object.demand_identification_simulation_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240,
-        runtime=config_object.area_simulation_resources.runtime
+        mem_mb=memory_string_to_mb(config_object.demand_identification_simulation_resources.memory) + 10240,
+        runtime=config_object.demand_identification_simulation_resources.runtime
     params:
         output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash),
         args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
     shell:
         """
-        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
+        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
         org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
         --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
@@ -372,12 +385,13 @@ rule fleet_sizing_simulation:
     params:
         output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
         args = lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False)
-    threads: config_object.area_simulation_resources.threads
+    threads: config_object.single_iteration_simulation_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.area_simulation_resources.memory) + 10240
+        mem_mb=memory_string_to_mb(config_object.single_iteration_simulation_resources.memory) + 10240,
+        runtime=config_object.single_iteration_simulation_resources.runtime
     shell:
         """
-        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_simulation_resources.memory} -cp {input.jar_path} \
+        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
         org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
         --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
         --config:plans.inputPlansFile {input.plans} \
@@ -401,7 +415,8 @@ checkpoint fleet_size_evaluation:
     output:
         ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=60
     threads: 1
     run:
         import os
@@ -459,7 +474,8 @@ rule fleet_sizing:
         fleet_sizing_input
     threads: 1
     resources:
-        mem_mb=2048
+        mem_mb=2048,
+        runtime=60
     params:
         fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
     output:
@@ -484,7 +500,8 @@ rule simulation_summary:
         summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
     threads: 1
     resources:
-        mem_mb=1024
+        mem_mb=1024,
+        runtime=5
     run:
         import yaml
         import os

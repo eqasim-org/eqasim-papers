@@ -10,12 +10,18 @@ resources:
   cutter:
     threads: 14
     memory: "50G"
-  area_simulations:
+  area_baseline_simulations:
     threads: 12
     memory: "50G"
     runtime: 2880
   area_routing:
     threads: 10
+    memory: "50G"
+  demand_identification_simulations:
+    threads: 100
+    memory: "50"
+  single_iteration_fleet_simulations:
+    threads: 4
     memory: "50G"
 
 general_inputs:

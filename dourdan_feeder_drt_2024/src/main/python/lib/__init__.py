@@ -34,7 +34,7 @@ class ResourcesConfig:
     def __init__(self, config_dict, max_cores):
         self.threads = min(max_cores, int(config_dict["threads"]))
         self.memory = config_dict["memory"]
-        self.runtime = 60 * 24
+        self.runtime = 60 * 24 * 10
         if "runtime" in config_dict:
             self.runtime = int(config_dict["runtime"])
 
@@ -212,10 +212,14 @@ class PipelineConfig:
         self.random_seed = int(config_dict["random_seed"])
 
         self.java = JavaConfig(config_dict["java"])
+
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
-        self.area_simulation_resources = ResourcesConfig(config_dict["resources"]["area_simulations"], max_cores)
+        self.area_baseline_simulation_resources = ResourcesConfig(config_dict["resources"]["area_baseline_simulations"], max_cores)
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
         self.area_routing_resources = ResourcesConfig(config_dict["resources"]["area_routing"], max_cores)
+        self.demand_identification_simulation_resources = ResourcesConfig(config_dict["resources"]["demand_identification_simulations"], max_cores)
+        self.single_iteration_simulation_resources = ResourcesConfig(config_dict["resources"]["single_iteration_fleet_simulations"], max_cores)
+
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
         self.area_configs = {area_id: AreaConfig(area_id, area_config_dict, basedir) for area_id, area_config_dict in
                              config_dict["areas"].items()}
