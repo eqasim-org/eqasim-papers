@@ -485,7 +485,7 @@ rule fleet_sizing:
     params:
         fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
     output:
-        "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip"
+        "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip" % config_object.output_path
     run:
         import shutil
         import os
@@ -522,4 +522,6 @@ rule simulation_summary:
 rule all:
     default_target: True
     input:
-        expand(["%s/simulations/evaluation/{area_id}/%s/%s/output_plans.xml.gz" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()], area_id=list(config_object.area_configs.keys())),
+        expand(["%s/simulations/evaluation/{area_id}/%s/%s/{file}" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
+            area_id=list(config_object.area_configs.keys()),
+            file=["results.zip", "summary.yaml"]),
