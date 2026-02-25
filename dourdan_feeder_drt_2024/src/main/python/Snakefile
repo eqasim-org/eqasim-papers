@@ -381,7 +381,7 @@ rule fleet_sizing_simulation:
     input:
         unpack(lambda wildcards: config_object.get_simulation_inputs(wildcards.area_id, wildcards.hash, demand_identification=False, fleet_size=wildcards.fleet_size, random_seed=wildcards.seed, jar_path=jar_path))
     output:
-        ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/{seed}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
+        "%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/{seed}.zip" % (config_object.output_path)
     params:
         output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
         args = lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False)
@@ -399,21 +399,29 @@ rule fleet_sizing_simulation:
         --config:eqasim.costParametersPath {input.cost_params} {params.args} \
         --config:dvrp.initialTravelTimesFile {input.dvrp_travel_times} \
         --config:transit.transitScheduleFile {input.transit_schedule}
+        zip -r -j -m -T {params.output_dir}.zip {params.output_dir}
         """
 
 
 def get_rejection_rate(sim_path):
     import pandas as pd
-    df = pd.read_csv("%s/drt_customer_stats_drt.csv" % sim_path, sep=";")
+    import os
+    import zipfile
+    if os.path.isfile(sim_path) and sim_path.endswith(".zip"):
+        with zipfile.ZipFile(sim_path) as zip:
+            with zip.open("drt_customer_stats_drt.csv") as f:
+                df = pd.read_csv(f)
+    else:
+        df = pd.read_csv("%s/drt_customer_stats_drt.csv" % sim_path, sep=";")
     requests = df.iloc[-1]["rides"] + df.iloc[-1]["rejections"]
     rejection_rate = df.iloc[-1]["rejections"] / requests
     return rejection_rate
 
 checkpoint fleet_size_evaluation:
     input:
-        [["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/%d/%s" % (config_object.output_path, seed, sim_output) for seed in config_object.fleet_sizing_config.fleet_seeds] for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/%d.zip" % (config_object.output_path, seed) for seed in config_object.fleet_sizing_config.fleet_seeds]
     output:
-        ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        "%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best.zip"
     resources:
         mem_mb=2048,
         runtime=60
@@ -421,20 +429,18 @@ checkpoint fleet_size_evaluation:
     run:
         import os
         import shutil
+        import zipfile
         # We select the seed with minimum rejection rate
-        dirs = set([os.path.dirname(i) for i in input])
-        selected_dir = None
-        min_rejection_rate = None
-        for dir in dirs:
-            current_rejection_rate = get_rejection_rate(dir)
+        zips = list(input)
+        selected_zip = None
+        for zip in zips:
+            current_rejection_rate = get_rejection_rate(zip)
             if min_rejection_rate is None or current_rejection_rate < min_rejection_rate:
                 min_rejection_rate = current_rejection_rate
-                selected_dir = dir
+                selected_zip = zip
         if min_rejection_rate is None:
             raise Exception("No input!")
-        dest_dir = os.path.dirname(output[0])
-        shutil.rmtree(dest_dir, ignore_errors=True)
-        shutil.copytree(selected_dir, dest_dir)
+        shutil.copy(selected_zip, output[0])
 
 
 
@@ -479,21 +485,20 @@ rule fleet_sizing:
     params:
         fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
     output:
-        ["%s/simulations/evaluation/{area_id}/{group}/{hash}/%s" % (config_object.output_path, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS],
+        "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip"
     run:
         import shutil
         import os
-        source_dir_path = os.path.dirname(input[0])
-        dest_dir_path = os.path.dirname(output[0])
-        shutil.rmtree(dest_dir_path, ignore_errors=True)
-        shutil.copytree(source_dir_path, dest_dir_path)
-        with open(os.path.join(dest_dir_path, "fleet_size.txt"), "w") as f:
-            f.write(params.fleet_size)
+        import zipfile
+        shutil.copy(input[0], output[0])
+        with zipfile.ZipFile(output[0], "w") as zip:
+            with zip.open("fleet_size.txt", "w") as f:
+                f.write(params.fleet_size)
 
 
 rule simulation_summary:
     input:
-        lambda wildcards: ["%s/simulations/evaluation/%s/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip" % config_object.output_path
     output:
         "%s/simulations/evaluation/{area_id}/{group}/{hash}/summary.yaml" % config_object.output_path
     params:
@@ -505,8 +510,10 @@ rule simulation_summary:
     run:
         import yaml
         import os
-        with open(os.path.join(os.path.dirname(output[0]), "fleet_size.txt")) as f:
-            fleet_size = int(f.read())
+        import zipfile
+        with zipfile.ZipFile(input[0]) as zip:
+            with zip.open("fleet_size.txt") as f:
+                fleet_size = int(f.read())
         params.summary["fleet_size"] = fleet_size
         with open(output[0], "w") as f:
             yaml.dump(params.summary,  f, default_flow_style=False)
