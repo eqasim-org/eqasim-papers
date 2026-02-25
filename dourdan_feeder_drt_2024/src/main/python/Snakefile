@@ -493,7 +493,7 @@ rule fleet_sizing:
 
 rule simulation_summary:
     input:
-        lambda wildcards: ["%s/simulations/evaluation/%s/%s/%s" % (config_object.output_path, wildcards.group, wildcards.hash, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        lambda wildcards: ["%s/simulations/evaluation/%s/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash, sim_output) for sim_output in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
     output:
         "%s/simulations/evaluation/{area_id}/{group}/{hash}/summary.yaml" % config_object.output_path
     params:
