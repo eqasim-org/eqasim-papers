@@ -421,7 +421,7 @@ checkpoint fleet_size_evaluation:
     input:
         ["%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/seeds/%d.zip" % (config_object.output_path, seed) for seed in config_object.fleet_sizing_config.fleet_seeds]
     output:
-        "%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best.zip"
+        "%s/simulations/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/best.zip" % config_object.output_path
     resources:
         mem_mb=2048,
         runtime=60
