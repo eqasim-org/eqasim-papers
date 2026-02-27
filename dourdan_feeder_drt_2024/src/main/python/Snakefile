@@ -427,12 +427,11 @@ checkpoint fleet_size_evaluation:
         runtime=60
     threads: 1
     run:
-        import os
         import shutil
-        import zipfile
         # We select the seed with minimum rejection rate
         zips = list(input)
         selected_zip = None
+        min_rejection_rate = None
         for zip in zips:
             current_rejection_rate = get_rejection_rate(zip)
             if min_rejection_rate is None or current_rejection_rate < min_rejection_rate:
