@@ -410,7 +410,7 @@ def get_rejection_rate(sim_path):
     if os.path.isfile(sim_path) and sim_path.endswith(".zip"):
         with zipfile.ZipFile(sim_path) as zip:
             with zip.open("drt_customer_stats_drt.csv") as f:
-                df = pd.read_csv(f)
+                df = pd.read_csv(f, sep=";")
     else:
         df = pd.read_csv("%s/drt_customer_stats_drt.csv" % sim_path, sep=";")
     requests = df.iloc[-1]["rides"] + df.iloc[-1]["rejections"]
