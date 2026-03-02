@@ -491,8 +491,7 @@ rule fleet_sizing:
         import zipfile
         shutil.copy(input[0], output[0])
         with zipfile.ZipFile(output[0], "w") as zip:
-            with zip.open("fleet_size.txt", "w") as f:
-                f.write(params.fleet_size)
+            zip.writestr("fleet_size.txt", params.fleet_size)
 
 
 rule simulation_summary:
