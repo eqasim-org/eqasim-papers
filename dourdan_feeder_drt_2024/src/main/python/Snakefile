@@ -118,6 +118,7 @@ rule global_simulation_baseline:
     resources:
         mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory),
         runtime=config_object.global_simulation_resources.runtime
+    benchmark: "%s/benchmarks/global_simulation_baseline.txt" % config_object.output_path
     shell:
         '''
         {java_cmd} -cp "{jar_path}" -Xmx{config_object.global_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
@@ -159,6 +160,7 @@ rule cutter:
         runtime=config_object.cutter_resources.runtime
     params:
         output_dir=lambda wildcards: config_object.area_simulation_inputs_location(config_object.get_area_by_prefix(wildcards.area_prefix).id)
+    benchmark: "%s/benchmarks/cutter/{area_prefix}.txt" % config_object.output_path
     shell:
         """
         {java_cmd} -cp "{input[0]}" -Xmx{config_object.cutter_resources.memory} -XX:MaxRAMPercentage=100.0 org.eqasim.core.scenario.cutter.RunScenarioCutterV2 \
@@ -190,6 +192,7 @@ rule area_simulation_baseline:
         runtime=config_object.area_baseline_simulation_resources.runtime
     params:
         output_dir=lambda wildcards: "%s/simulations/%sbaseline" % (config_object.output_path, wildcards.area_prefix)
+    benchmark: "%s/benchmarks/area_baseline/{area_prefix}.txt" % config_object.output_path
     shell:
         '''
         {java_cmd} -Xmx{config_object.area_baseline_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 -cp {jar_path} org.eqasim.ile_de_france.RunSimulation \
@@ -300,6 +303,7 @@ rule modified_transit_schedule_plans:
         runtime=config_object.area_routing_resources.runtime
     output:
         "%s/modified_transit_schedules/{schedule}/{area_prefix}plans.xml.gz" % config_object.output_path
+    benchmark: "%s/benchmarks/routing/{area_prefix}{schedule}.txt" % config_object.output_path
     shell:
         """
         {java_cmd} -Xmx{config_object.area_routing_resources.memory} -cp {input.jar} \
@@ -365,6 +369,7 @@ rule demand_identification_simulation:
     params:
         output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash),
         args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
+    benchmark: "%s/benchmarks/demand_identification/{area_id}/{group}/{hash}.txt" % config_object.output_path
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
@@ -389,6 +394,7 @@ rule fleet_sizing_simulation:
     resources:
         mem_mb=memory_string_to_mb(config_object.single_iteration_simulation_resources.memory) + 10240,
         runtime=config_object.single_iteration_simulation_resources.runtime
+    benchmark: "%s/benchmarks/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/{seed}.txt" % config_object.output_path
     shell:
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
