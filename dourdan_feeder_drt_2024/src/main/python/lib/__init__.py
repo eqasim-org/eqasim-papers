@@ -237,7 +237,7 @@ class PipelineConfig:
 
         # Todo check area prefix unicity
 
-        self.drop_simulation_outputs = list(set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" else []
+        self.drop_simulation_outputs = list(set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" in config_dict else []
         for f in self.drop_simulation_outputs:
             if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS:
                 raise Exception("simulation output file `%s` cannot be dropped" % f)
