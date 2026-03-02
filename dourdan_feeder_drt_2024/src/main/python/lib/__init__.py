@@ -204,7 +204,7 @@ def dctproduct(dct):
 
 class PipelineConfig:
     RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
-                                   "output_plans.xml.gz", "drt_customer_stats_drt.csv"]
+                                   "output_plans.xml.gz"]
 
     def __init__(self, config_dict, basedir, max_cores):
         self.output_path = to_absolute(config_dict["output_path"], basedir)
@@ -239,7 +239,7 @@ class PipelineConfig:
 
         self.drop_simulation_outputs = list(set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" in config_dict else []
         for f in self.drop_simulation_outputs:
-            if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS:
+            if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS or f == "drt_customer_stats_drt.csv":
                 raise Exception("simulation output file `%s` cannot be dropped" % f)
 
 
