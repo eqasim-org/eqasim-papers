@@ -490,6 +490,7 @@ rule fleet_sizing:
         import os
         import zipfile
         shutil.copy(input[0], output[0])
+        check = int(params.fleet_size)
         with zipfile.ZipFile(output[0], "w") as zip:
             zip.writestr("fleet_size.txt", params.fleet_size)
 
