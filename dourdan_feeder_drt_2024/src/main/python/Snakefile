@@ -482,7 +482,7 @@ rule fleet_sizing:
         mem_mb=2048,
         runtime=60
     params:
-        fleet_size=lambda wildcards, input: str(input[0].split("/")[-3])
+        fleet_size=lambda wildcards, input: str(input[0].split("/")[-2])
     output:
         "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip" % config_object.output_path
     run:
