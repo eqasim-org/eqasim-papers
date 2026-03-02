@@ -204,7 +204,7 @@ def dctproduct(dct):
 
 class PipelineConfig:
     RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
-                                   "output_plans.xml.gz"]
+                                   "output_plans.xml.gz", "drt_customer_stats_drt.csv "]
 
     def __init__(self, config_dict, basedir, max_cores):
         self.output_path = to_absolute(config_dict["output_path"], basedir)
@@ -236,6 +236,12 @@ class PipelineConfig:
             config_dict["deployment_scenarios"].items()}
 
         # Todo check area prefix unicity
+
+        self.drop_simulation_outputs = list(set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" else []
+        for f in self.drop_simulation_outputs:
+            if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS:
+                raise Exception("simulation output file `%s` cannot be dropped" % f)
+
 
         self.simulation_configs = dict()
         for deployment_scenario in self.deployment_scenarios.values():
@@ -410,7 +416,7 @@ class PipelineConfig:
                           self.service_parameters_config.non_demand_impacting_params]:
             for service_parameter in container.values():
                 if service_parameter.name == "operational_scheme" and "stop_based" in service_parameter.values:
-                    result.append("----config:multiModeDrt.drt[mode=drt].transitStopFile " + self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
+                    result.append("--config:multiModeDrt.drt[mode=drt].transitStopFile " + self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
                     break
             if added_drt_stops:
                 break
