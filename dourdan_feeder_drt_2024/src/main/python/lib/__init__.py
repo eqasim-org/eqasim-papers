@@ -204,7 +204,7 @@ def dctproduct(dct):
 
 class PipelineConfig:
     RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
-                                   "output_plans.xml.gz", "drt_customer_stats_drt.csv "]
+                                   "output_plans.xml.gz", "drt_customer_stats_drt.csv"]
 
     def __init__(self, config_dict, basedir, max_cores):
         self.output_path = to_absolute(config_dict["output_path"], basedir)
