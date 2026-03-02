@@ -115,7 +115,6 @@ drop_simulation_outputs:
   - "ph*"
   - "output_wait*"
   - "output_vehicles.csv"
-  - "output_trips.csv.gz"
   - "output_transit*"
   - "output_task*"
   - "output_persons.csv.gz"
