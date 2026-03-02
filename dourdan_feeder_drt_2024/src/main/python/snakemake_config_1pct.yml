@@ -107,6 +107,46 @@ deployment_scenarios:
     simulation_overrides:
       transit_schedule: "tsc"
 
+drop_simulation_outputs:
+  - "traveldistancesstats.csv"
+  - "stopwatch.png"
+  - "scorestats.csv"
+  - "pkm*"
+  - "ph*"
+  - "output_wait*"
+  - "output_vehicles.csv"
+  - "output_trips.csv.gz"
+  - "output_transit*"
+  - "output_task*"
+  - "output_persons.csv.gz"
+  - "output_occupancy*"
+  - "output_network.xml.gz"
+  - "output_links.csv.gz"
+  - "output_legs.csv.gz"
+  - "output_households.xml.gz"
+  - "output_facilities.xml.gz"
+  - "output_counts.xml.gz"
+  - "output_constraints*"
+  - "output_config_reduced.xml"
+  - "output_allVehicles.xml.gz"
+  - "output_activities.csv.gz"
+  - "modules.dot"
+  - "modestats.csv"
+  - "modeChoice*"
+  - "logfile*"
+  - "dvrp_travel_times.csv.gz"
+  - "dmc_utilities.csv"
+  - "ITERS/it.0/0.*.png"
+  - "ITERS/it.0/0.trips.csv.gz"
+  - "ITERS/it.0/0.task*"
+  - "ITERS/it.0/0.plans.xml.gz"
+  - "ITERS/it.0/0.leg*"
+  - "ITERS/it.0/0.events.xml.gz"
+  - "ITERS/it.0/0.eqasim*"
+  - "ITERS/it.0/0.dvrp_traveil_times.csv.gz"
+  - "ITERS/it.0/0.activities.csv.gz"
+
+
 # Fleet sizing is handled differently because we aim at finding the minimal fleet size that achieves a rejection rate below a thershold
 fleet_sizing:
   demand_identification_fleet_size: 10 # This fleet size will be used in the demand identification simulations, must be part of the list below
