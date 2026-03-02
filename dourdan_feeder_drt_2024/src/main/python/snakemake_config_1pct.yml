@@ -18,8 +18,8 @@ resources:
     threads: 10
     memory: "50G"
   demand_identification_simulations:
-    threads: 100
-    memory: "50"
+    threads: 12
+    memory: "50G"
   single_iteration_fleet_simulations:
     threads: 4
     memory: "50G"
