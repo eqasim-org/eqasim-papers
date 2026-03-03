@@ -408,7 +408,7 @@ rule fleet_sizing_simulation:
         --config:transit.transitScheduleFile {input.transit_schedule}
         cd {params.output_dir}
         rm -rf {params.to_remove}
-        zip -r -m -T ../{params.output_dir}.zip *
+        zip -r -m -T ../{wildcards.seed}.zip *
         """
 
 
