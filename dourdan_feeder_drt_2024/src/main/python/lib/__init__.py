@@ -194,6 +194,9 @@ class GeneralInputsConfig:
         self.input_path = to_absolute(config_dict["input_path"], basedir)
         self.input_prefix = config_dict["input_prefix"]
         self.sampling = config_dict["sampling"]
+        self.baseline_outputs = None
+        if "baseline_outputs" in config_dict:
+            self.baseline_outputs = to_absolute(config_dict["baseline_outputs"], basedir)
 
 
 def dctproduct(dct):
@@ -216,10 +219,6 @@ class PipelineConfig:
         self.random_seed = int(config_dict["random_seed"])
 
         self.java = JavaConfig(config_dict["java"])
-
-        self.directly_cut_using = None
-        if "directly_cut_using" in config_dict:
-            self.directly_cut_using = to_absolute(config_dict["directly_cut_using"], basedir)
 
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
         self.area_baseline_simulation_resources = ResourcesConfig(config_dict["resources"]["area_baseline_simulations"], max_cores)
