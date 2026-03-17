@@ -5,5 +5,5 @@ channels:
 dependencies:
   - snakemake
   - maven
-  - openjdk=22
+  - openjdk=25
   - pip
