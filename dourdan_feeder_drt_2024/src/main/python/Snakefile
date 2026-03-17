@@ -105,10 +105,17 @@ baseline_plans_path = config_object.global_simulation_output_file_path("output_p
 baseline_events_path = config_object.global_simulation_output_file_path("output_events.xml.gz")
 baseline_travel_times_path = config_object.global_simulation_output_file_path("vdf_travel_times.bin")
 
+def global_simulation_baseline_input(wildcards):
+    if config_object.directly_cut_using is None:
+        return config_object.global_baseline_config_path
+    else:
+        return ["%s/%s" % (config_object.directly_cut_using, f) for f in ["eqasim_trips.csv", "output_plans.xml.gz",
+                                                                          "output_events.xml.gz", "vdf_travel_times.bin"]]
+
 
 rule global_simulation_baseline:
     input:
-        config_object.global_baseline_config_path
+        global_simulation_baseline_input
     output:
         baseline_trips_path,
         baseline_plans_path,
@@ -116,15 +123,22 @@ rule global_simulation_baseline:
         baseline_travel_times_path
     threads: config_object.global_simulation_resources.threads
     resources:
-        mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory),
-        runtime=config_object.global_simulation_resources.runtime
+        mem_mb=memory_string_to_mb(config_object.global_simulation_resources.memory) if config_object.directly_cut_using is None else 1024,
+        runtime=config_object.global_simulation_resources.runtime if config_object.directly_cut_using is None else 5
     benchmark: "%s/benchmarks/global_simulation_baseline.txt" % config_object.output_path
+    params:
+        directly_cut_using="" if config_object.directly_cut_using is None else config_object.directly_cut_using
     shell:
         '''
         {java_cmd} -cp "{jar_path}" -Xmx{config_object.global_simulation_resources.memory} -XX:MaxRAMPercentage=100.0 \
         org.eqasim.ile_de_france.RunSimulation --config-path="{input[0]}" \
         --config:controller.outputDirectory={config_object.global_simulation_outputs_location} \
         --config:global.numberOfThreads={threads}
+        ''' if config_object.directly_cut_using is None else '''
+        ln -s {input[0]} {output[0]}
+        ln -s {input[1]} {output[1]}
+        ln -s {input[2]} {output[2]}
+        ln -s {input[3]} {output[3]}
         '''
 
 

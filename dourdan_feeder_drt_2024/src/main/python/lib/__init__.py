@@ -217,6 +217,10 @@ class PipelineConfig:
 
         self.java = JavaConfig(config_dict["java"])
 
+        self.directly_cut_using = None
+        if "directly_cut_using" in config_dict:
+            self.directly_cut_using = to_absolute(config_dict["directly_cut_using"], basedir)
+
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
         self.area_baseline_simulation_resources = ResourcesConfig(config_dict["resources"]["area_baseline_simulations"], max_cores)
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
