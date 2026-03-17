@@ -149,6 +149,7 @@ fleet_sizing:
   fleet_seeds: 10
   max_rejection_rate: "0.05"
   fleet_size_precision: 5
+  start_upper_bound: 50
   max_fleet_size: 6400
 
 output_path: "output"

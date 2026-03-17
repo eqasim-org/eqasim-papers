@@ -144,9 +144,13 @@ class FleetSizingConfig:
         self.max_rejection_rate = config_dict["max_rejection_rate"]
         self.fleet_size_precision = config_dict["fleet_size_precision"]
         self.max_fleet_size = None
+        self.start_upper_bound = None
         if "max_fleet_size" in config_dict:
             self.max_fleet_size = int(config_dict["max_fleet_size"])
             assert self.max_fleet_size > self.demand_identification_fleet_size and self.max_fleet_size >= self.fleet_size_precision * 10
+        if "start_upper_bound" in config_dict:
+            self.start_upper_bound = int(config_dict["start_upper_bound"])
+            assert self.start_upper_bound > self.fleet_size_precision * 2
         assert self.demand_identification_fleet_size % self.fleet_size_precision == 0
         assert isinstance(self.demand_identification_fleet_size, int)
         float(self.max_rejection_rate)
