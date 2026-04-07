@@ -3,6 +3,8 @@ import os
 import hashlib
 import itertools
 import random
+from scipy.stats import qmc
+from numpy import random as nprand
 
 
 def to_absolute(in_path, ref_path):
@@ -49,32 +51,79 @@ class ModifiedTransitScheduleConfig:
 
 
 class ServiceParameter:
-    def __init__(self, name, values):
+    LHS_COMMANDS = ["lhs-int-interval", "lhs-float-interval"]
+
+    def __init__(self, name, content):
         self.name = name
-        if isinstance(values, list):
-            self.values = values
-            self.separate_per_service = False
-        elif isinstance(values, dict):
-            self.values = values["values"]
-            self.separate_per_service = values["separate_per_service"]
-            assert isinstance(self.values, list)
+        self.separate_per_service = False
+        self.values = None
+        self.lhs = None
+        self.randomness = None
+
+        if isinstance(content, list):
+            self.values = content
+
+        elif isinstance(content, dict):
+            if "values" in content:
+                self.values = content["values"]
+                assert isinstance(self.values, list)
+
+            if "separate_per_service" in content:
+                self.separate_per_service = bool(content["separate_per_service"])
+
+            if "randomness" in content:
+                assert not self.separate_per_service
+                if content["randomness"] == "uniform":
+                    assert self.values is not None
+                    self.randomness = "uniform"
+                elif isinstance(content["randomness"], dict):
+                    assert len(content["randomness"]) == 1
+                    for c in ServiceParameter.LHS_COMMANDS:
+                        if c in content["randomness"]:
+                            self.lhs = (c, content["randomness"][c])
+                    assert self.lhs is not None
+                    self.randomness = "lhs"
+            else:
+                assert self.values is not None
+
         else:
             raise Exception("Wrong service parameter format")
         self.check()
 
+    @property
+    def is_stochastic(self):
+        return self.randomness is not None
+
+    def number_of_possible_values(self):
+        if self.values is not None:
+            return len(self.values)
+        else:
+            assert self.lhs is not None
+            if self.lhs[0] == "lhs-float-interval":
+                return 10e9
+            elif self.lhs[0] == "lhs-int-interval":
+                lower_bound, upper_bound = self.lhs[1]["bounds"]
+                step = self.lhs[1]["bounds"]["step"] if "step" in self.lhs[1]["bounds"] else 1
+                possible_values = list(range(lower_bound, upper_bound + step, step))
+                return len(possible_values)
+            raise Exception("Invalid state")
+
     def check(self):
-        if len(self.values) != len(set(self.values)):
+        if self.values is not None and len(self.values) != len(set(self.values)):
             raise Exception("Service parameter contains duplicate values")
         if self.name == "operational_scheme":
-            assert set(self.values).issubset(["stop_based", "door_to_door"])
+            assert self.values is None or set(self.values).issubset(["stop_based", "door_to_door"])
         elif self.name == "price":
-            [float(p) for p in self.values]
+            if self.values is not None:
+                [float(p) for p in self.values]
         elif self.name == "detour_factor":
-            for v in set(self.values):
-                assert isinstance(v, str) and v.startswith("+") and v[-1] in ["%", "s"]
-                float(v[1:-1])
+            if self.values is not None:
+                for v in set(self.values):
+                    assert isinstance(v, str) and v.startswith("+") and v[-1] in ["%", "s"]
+                    float(v[1:-1])
         elif self.name in ["vehicle_capacity", "prebooking", "max_wait_time"]:
-            [int(v) for v in self.values]
+            if self.values is not None:
+                [int(v) for v in self.values]
         else:
             raise Exception("Unsupported service parameter: %s" % self.name)
 
@@ -85,6 +134,102 @@ class ServiceParametersConfig:
                                         config_dict["demand_impacting"].items()}
         self.non_demand_impacting_params = {key: ServiceParameter(key, value) for key, value in
                                             config_dict["non_demand_impacting"].items()}
+
+        self.is_stochastic = False
+        for value in self.demand_impacting_params.values():
+            if value.is_stochastic:
+                self.is_stochastic = True
+                break
+        if not self.is_stochastic:
+            for value in self.non_demand_impacting_params.values():
+                if value.is_stochastic:
+                    self.is_stochastic = True
+                    break
+
+    def get_configs(self, deployment_scenario, samples_per_deterministic_combination=None, seed: int = None):
+        if self.is_stochastic and samples_per_deterministic_combination is None:
+            raise Exception("The number of samples must be specified in the presence of stochastic parameters")
+        if (samples_per_deterministic_combination is None) != (seed is None):
+            raise Exception(
+                "seed must be specified if samples_per_deterministic_combination is specified and vice versa")
+
+        non_stochastic_parameters_dict = dict()
+        nb_stochastic_combinations = 1
+
+        for param_name, param in list(self.demand_impacting_params.items()) + list(
+                self.non_demand_impacting_params.items()):
+            if param.is_stochastic:
+                nb_stochastic_combinations *= param.number_of_possible_values()
+                continue
+            values = param.values
+            if param.separate_per_service:
+                values = list(dctproduct({service_type: values for service_type in deployment_scenario.service_types}))
+            assert isinstance(values, list)
+            non_stochastic_parameters_dict[param_name] = values
+
+        if not self.is_stochastic:
+            return [SimulationConfig(deployment_scenario, self, service_parameters_values) for service_parameters_values
+                    in dctproduct(non_stochastic_parameters_dict)]
+
+
+        lhs_params = dict()
+        for param in list(self.demand_impacting_params.values()) + list(self.non_demand_impacting_params.values()):
+            if param.lhs is not None:
+                lhs_params[param.name] = param
+
+        sorted_lhs_params = list(lhs_params.keys())
+        sorted_lhs_params.sort()
+        configs = []
+
+        generator = nprand.default_rng(seed=seed)
+
+        if nb_stochastic_combinations <= 5 * samples_per_deterministic_combination or samples_per_deterministic_combination > 10e6:
+            raise Exception("Too many samples")
+
+        sampler = None
+
+        for deterministic_parameter_values in dctproduct(non_stochastic_parameters_dict):
+            # If there is no deterministic parameter, dctproduct returns a list containing one empty dict
+            current_hashes = set()
+            current_configs = list()
+            while len(current_configs) < samples_per_deterministic_combination:
+                # We add one sample at a time
+                parameter_values = dict(**deterministic_parameter_values)
+                # First we sample LHS params
+                if len(sorted_lhs_params) > 0:
+                    if sampler is None:
+                        sampler = qmc.LatinHypercube(len(sorted_lhs_params), rng=generator)
+                    sample = sampler.random(n=1)[0]
+                    assert len(sample) == len(lhs_params)
+                    for key, sampled_value in zip(sorted_lhs_params, sample):
+                        param = lhs_params[key]
+                        lhs_command, command_args = param.lhs
+
+                        if lhs_command == "lhs-int-interval":
+                            lower_bound, upper_bound = command_args["bounds"]
+                            step = command_args["step"] if "step" in command_args else 1
+                            possible_values = list(range(lower_bound, upper_bound + step, step))
+                            value = possible_values[int(sampled_value * len(possible_values))]
+                        elif lhs_command == "lhs-float-interval":
+                            lower_bound, upper_bound = command_args["bounds"]
+                            value = float(sampled_value * (upper_bound - lower_bound) + lower_bound)
+                            if "format" in command_args:
+                                value = command_args["format"] % value
+                        else:
+                            raise Exception("Unkown command %s" % lhs_command)
+                        parameter_values[param.name] = value
+
+                # Then we sample independent params
+                for param in list(self.demand_impacting_params.values()) + list(self.non_demand_impacting_params.values()):
+                    if param.randomness == "uniform":
+                        parameter_values[param.name] = generator.choice(param.values)
+                config = SimulationConfig(deployment_scenario, self, parameter_values)
+                # We make sure that there is no redundancy
+                if config.hash_code not in current_hashes:
+                    current_hashes.add(config.hash_code)
+                    current_configs.append(config)
+            configs.extend(current_configs)
+        return configs
 
 
 class ServiceType:
@@ -221,11 +366,14 @@ class PipelineConfig:
         self.java = JavaConfig(config_dict["java"])
 
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
-        self.area_baseline_simulation_resources = ResourcesConfig(config_dict["resources"]["area_baseline_simulations"], max_cores)
+        self.area_baseline_simulation_resources = ResourcesConfig(config_dict["resources"]["area_baseline_simulations"],
+                                                                  max_cores)
         self.cutter_resources = ResourcesConfig(config_dict["resources"]["cutter"], max_cores)
         self.area_routing_resources = ResourcesConfig(config_dict["resources"]["area_routing"], max_cores)
-        self.demand_identification_simulation_resources = ResourcesConfig(config_dict["resources"]["demand_identification_simulations"], max_cores)
-        self.single_iteration_simulation_resources = ResourcesConfig(config_dict["resources"]["single_iteration_fleet_simulations"], max_cores)
+        self.demand_identification_simulation_resources = ResourcesConfig(
+            config_dict["resources"]["demand_identification_simulations"], max_cores)
+        self.single_iteration_simulation_resources = ResourcesConfig(
+            config_dict["resources"]["single_iteration_fleet_simulations"], max_cores)
 
         self.general_inputs_config = GeneralInputsConfig(config_dict["general_inputs"], basedir)
         self.area_configs = {area_id: AreaConfig(area_id, area_config_dict, basedir) for area_id, area_config_dict in
@@ -244,15 +392,18 @@ class PipelineConfig:
 
         # Todo check area prefix unicity
 
-        self.drop_simulation_outputs = list(set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" in config_dict else []
+        self.drop_simulation_outputs = list(
+            set(config_dict["drop_simulation_outputs"])) if "drop_simulation_outputs" in config_dict else []
         for f in self.drop_simulation_outputs:
             if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS or f == "drt_customer_stats_drt.csv":
                 raise Exception("simulation output file `%s` cannot be dropped" % f)
 
+        self.samples_per_deterministic_combination = int(config_dict["samples_per_deterministic_combination"]) \
+            if "samples_per_deterministic_combination" in config_dict else None
 
         self.simulation_configs = dict()
         for deployment_scenario in self.deployment_scenarios.values():
-            new_configs = self.get_deployment_scenario_simulation_configs(deployment_scenario)
+            new_configs = self.updated_get_deployment_scenario_simulation_configs(deployment_scenario)
             assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
             self.simulation_configs.update(new_configs)
 
@@ -374,7 +525,8 @@ class PipelineConfig:
 
         # We add drt stops as a dependency only if we actually want to simulate a stop_based service
         added_drt_stops = False
-        for container in [self.service_parameters_config.demand_impacting_params, self.service_parameters_config.non_demand_impacting_params]:
+        for container in [self.service_parameters_config.demand_impacting_params,
+                          self.service_parameters_config.non_demand_impacting_params]:
             for service_parameter in container.values():
                 if service_parameter.name == "operational_scheme" and "stop_based" in service_parameter.values:
                     inputs.append(self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
@@ -423,11 +575,31 @@ class PipelineConfig:
                           self.service_parameters_config.non_demand_impacting_params]:
             for service_parameter in container.values():
                 if service_parameter.name == "operational_scheme" and "stop_based" in service_parameter.values:
-                    result.append("--config:multiModeDrt.drt[mode=drt].transitStopFile " + self.area_simulation_input_file_path(area_id, "drt_stops.xml"))
+                    result.append(
+                        "--config:multiModeDrt.drt[mode=drt].transitStopFile " + self.area_simulation_input_file_path(
+                            area_id, "drt_stops.xml"))
                     break
             if added_drt_stops:
                 break
         return " ".join(result)
+
+    def updated_get_deployment_scenario_simulation_configs(self, deployment_scenario):
+        if not isinstance(deployment_scenario, DeploymentScenario):
+            deployment_scenario = self.deployment_scenarios[deployment_scenario]
+
+        simulation_configs = {config.hash_code: config for config in
+                              self.service_parameters_config.get_configs(deployment_scenario,
+                                                                         self.samples_per_deterministic_combination,
+                                                                         self.random_seed)}
+
+        demand_impacting_hashes = dict()
+        for config in simulation_configs.values():
+            if config.demand_impacting_hash_code in demand_impacting_hashes:
+                config.demand_source = demand_impacting_hashes[config.demand_impacting_hash_code]
+            else:
+                demand_impacting_hashes[config.demand_impacting_hash_code] = config.hash_code
+                config.demand_source = config.hash_code
+        return simulation_configs
 
     def get_deployment_scenario_simulation_configs(self, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
@@ -564,6 +736,7 @@ class SimulationConfig:
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
         self.hash_code = SimulationConfig.hash(self)
+        self.demand_impacting_hash_code = SimulationConfig.demand_impacting_hash(self)
         self.demand_source = None
 
         for key, value in self.services_parameters_values.items():
@@ -592,5 +765,12 @@ class SimulationConfig:
     @staticmethod
     def hash(simulation_config):
         d = simulation_config.get_dict()
+        l = SimulationConfig.dict_to_deterministic_list(d)
+        return str(hashlib.sha256(str(l).encode("utf-8")).hexdigest())
+
+    @staticmethod
+    def demand_impacting_hash(simulation_config):
+        d = {key: value for key, value in simulation_config.get_dict().items()
+             if key in simulation_config.services_parameters_config.demand_impacting_params}
         l = SimulationConfig.dict_to_deterministic_list(d)
         return str(hashlib.sha256(str(l).encode("utf-8")).hexdigest())

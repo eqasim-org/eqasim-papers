@@ -1,0 +1,166 @@
+java: # Java and Maven command lines
+  java_cmd: "java"
+  mvn_cmd: "mvn"
+  local_maven_repo: ".m2/repository"
+
+resources:
+  global_simulations:
+    threads: 10
+    memory: "50G"
+  cutter:
+    threads: 14
+    memory: "50G"
+  area_baseline_simulations:
+    threads: 12
+    memory: "50G"
+    runtime: 2880
+  area_routing:
+    threads: 10
+    memory: "50G"
+  demand_identification_simulations:
+    threads: 12
+    memory: "50G"
+  single_iteration_fleet_simulations:
+    threads: 4
+    memory: "50G"
+
+general_inputs:
+  input_path: "inputs/simulation_inputs_1pct"
+  input_prefix: "ile_de_france_"
+  sampling: 0.01
+
+areas:
+  drn:
+    prefix: "drn_"
+    path: "inputs/drn20.gpkg" # The operating area where we want to implement the service
+    buffer_length: 5000 # We do not cut the scenario strictly on the operating area, we add a buffer to allow vehicles to travel on links that are not necessarily inside the area
+
+
+# Modified transit schedules are defined by removing transit lines from the original schedule
+# The lines to remove are based on a usage criteria as observed in the baseline simulation (after cutting)
+modified_transit_schedules:
+  tsb:
+    criteria: "passengers/hour"
+    transit_modes: ["bus"]
+    scope: "all_day"
+    threshold: 50
+  tsc:
+    criteria: "passengers/hour"
+    scope: "peak"
+    transit_modes: ["bus"]
+    threshold: 50
+
+# Service parameters are grouped into demand impacting and non demand impacting
+# This distinction is made to run simulations with mode choice only on unique combination of demand impacting parameters
+# Then within each combination, the non demand impacting parameters will then be varied (alongside fleet size) in one-iteration simulations
+# Most parameters will always be the same for all considered services, but they can also be different (further increasing the set of simulations), one example here is the prebooking
+service_parameters:
+  demand_impacting:
+    max_wait_time:
+      randomness:
+        lhs-int-interval:
+          bounds: [ 600, 1800 ]
+          step: 60
+    operational_scheme: ["stop_based", "door_to_door"]
+    price: ["0.3", "0.6", "0.9"]
+    detour_factor: ["+50%", "+1200s"] # Must begin with a + and end either with % or s
+  non_demand_impacting:
+    vehicle_capacity:
+      values: [4, 8]
+      randomness: "uniform"
+    prebooking:
+      separate_per_service: true
+      values: [0, 600]
+
+samples_per_deterministic_combination: 10
+
+# We define services offered by the DRT fleet
+# Each service has a type (unimodal or intermodal) and an availability (all_day or off_peak)
+# Moreover, intermodal services configure transfer locations by mode and/or facility ids
+services:
+  all_day_unimodal:
+    type: "unimodal"
+    availability: "all_day"
+  all_day_intermodal:
+    type: "intermodal"
+    availability: "all_day"
+    transfer_locations:
+      transit_modes: ["rail"]
+  off_peak_unimodal:
+    type: "unimodal"
+    availability: "off_peak"
+
+# Then we define deployment scenarios that combine one or more service types (within a single simulation).
+# Scenarios can have overrides compared to the baseline, for now we only override the transit schedule
+deployment_scenarios:
+  group1:
+    services: ["all_day_unimodal"]
+  group2:
+    services: ["all_day_intermodal"]
+  group3:
+    services: ["all_day_unimodal", "all_day_intermodal"]
+  group4:
+    services: ["off_peak_unimodal", "all_day_intermodal"]
+  group5:
+    services: ["all_day_unimodal", "all_day_intermodal"]
+    simulation_overrides:
+      transit_schedule: "tsb"
+  group6:
+    services: ["all_day_unimodal", "all_day_intermodal"]
+    simulation_overrides:
+      transit_schedule: "tsc"
+  group7:
+    services: ["off_peak_unimodal", "all_day_intermodal"]
+    simulation_overrides:
+      transit_schedule: "tsc"
+
+drop_simulation_outputs:
+  - "traveldistancesstats.csv"
+  - "stopwatch.png"
+  - "scorestats.csv"
+  - "pkm*"
+  - "ph*"
+  - "output_wait*"
+  - "output_vehicles.csv"
+  - "output_transit*"
+  - "output_task*"
+  - "output_persons.csv.gz"
+  - "output_occupancy*"
+  - "output_network.xml.gz"
+  - "output_links.csv.gz"
+  - "output_legs.csv.gz"
+  - "output_households.xml.gz"
+  - "output_facilities.xml.gz"
+  - "output_counts.xml.gz"
+  - "output_constraints*"
+  - "output_config_reduced.xml"
+  - "output_allVehicles.xml.gz"
+  - "output_activities.csv.gz"
+  - "modules.dot"
+  - "modestats.csv"
+  - "modeChoice*"
+  - "logfile*"
+  - "dvrp_travel_times.csv.gz"
+  - "dmc_utilities.csv"
+  - "ITERS/it.0/0.*.png"
+  - "ITERS/it.0/0.trips.csv.gz"
+  - "ITERS/it.0/0.task*"
+  - "ITERS/it.0/0.plans.xml.gz"
+  - "ITERS/it.0/0.leg*"
+  - "ITERS/it.0/0.events.xml.gz"
+  - "ITERS/it.0/0.eqasim*"
+  - "ITERS/it.0/0.dvrp_traveil_times.csv.gz"
+  - "ITERS/it.0/0.activities.csv.gz"
+
+
+# Fleet sizing is handled differently because we aim at finding the minimal fleet size that achieves a rejection rate below a thershold
+fleet_sizing:
+  demand_identification_fleet_size: 10 # This fleet size will be used in the demand identification simulations, must be part of the list below
+  fleet_seeds: 10
+  max_rejection_rate: "0.05"
+  fleet_size_precision: 5
+  max_fleet_size: 6400
+
+output_path: "output_1pct"
+temp_path: "temp_1pct"
+random_seed: 1234
