@@ -146,12 +146,12 @@ class ServiceParametersConfig:
                     self.is_stochastic = True
                     break
 
-    def get_configs(self, deployment_scenario, samples_per_deterministic_combination=None, seed: int = None):
-        if self.is_stochastic and samples_per_deterministic_combination is None:
-            raise Exception("The number of samples must be specified in the presence of stochastic parameters")
-        if (samples_per_deterministic_combination is None) != (seed is None):
+    def get_configs(self, area, deployment_scenario, samples_per_deterministic_combination=None, seed: int = None):
+        if self.is_stochastic != (samples_per_deterministic_combination is not None):
+            raise Exception("The number of samples must be specified only in the presence of stochastic parameters")
+        if samples_per_deterministic_combination is not None and seed is None:
             raise Exception(
-                "seed must be specified if samples_per_deterministic_combination is specified and vice versa")
+                "seed must be specified if samples_per_deterministic_combination is specified")
 
         non_stochastic_parameters_dict = dict()
         nb_stochastic_combinations = 1
@@ -168,9 +168,8 @@ class ServiceParametersConfig:
             non_stochastic_parameters_dict[param_name] = values
 
         if not self.is_stochastic:
-            return [SimulationConfig(deployment_scenario, self, service_parameters_values) for service_parameters_values
+            return [SimulationConfig(area, deployment_scenario, self, service_parameters_values) for service_parameters_values
                     in dctproduct(non_stochastic_parameters_dict)]
-
 
         lhs_params = dict()
         for param in list(self.demand_impacting_params.values()) + list(self.non_demand_impacting_params.values()):
@@ -220,10 +219,11 @@ class ServiceParametersConfig:
                         parameter_values[param.name] = value
 
                 # Then we sample independent params
-                for param in list(self.demand_impacting_params.values()) + list(self.non_demand_impacting_params.values()):
+                for param in list(self.demand_impacting_params.values()) + list(
+                        self.non_demand_impacting_params.values()):
                     if param.randomness == "uniform":
                         parameter_values[param.name] = generator.choice(param.values)
-                config = SimulationConfig(deployment_scenario, self, parameter_values)
+                config = SimulationConfig(area, deployment_scenario, self, parameter_values)
                 # We make sure that there is no redundancy
                 if config.hash_code not in current_hashes:
                     current_hashes.add(config.hash_code)
@@ -402,10 +402,11 @@ class PipelineConfig:
             if "samples_per_deterministic_combination" in config_dict else None
 
         self.simulation_configs = dict()
-        for deployment_scenario in self.deployment_scenarios.values():
-            new_configs = self.updated_get_deployment_scenario_simulation_configs(deployment_scenario)
-            assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
-            self.simulation_configs.update(new_configs)
+        for area_id in self.area_configs:
+            for deployment_scenario in self.deployment_scenarios.values():
+                new_configs = self.updated_get_deployment_scenario_simulation_configs(area_id, deployment_scenario)
+                assert len(set(self.simulation_configs.keys()).intersection(new_configs.keys())) == 0
+                self.simulation_configs.update(new_configs)
 
     def get_area_config(self, area_id):
         return self.area_configs[area_id]
@@ -583,12 +584,13 @@ class PipelineConfig:
                 break
         return " ".join(result)
 
-    def updated_get_deployment_scenario_simulation_configs(self, deployment_scenario):
+    def updated_get_deployment_scenario_simulation_configs(self, area, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
 
         simulation_configs = {config.hash_code: config for config in
-                              self.service_parameters_config.get_configs(deployment_scenario,
+                              self.service_parameters_config.get_configs(area,
+                                                                         deployment_scenario,
                                                                          self.samples_per_deterministic_combination,
                                                                          self.random_seed)}
 
@@ -601,7 +603,7 @@ class PipelineConfig:
                 config.demand_source = config.hash_code
         return simulation_configs
 
-    def get_deployment_scenario_simulation_configs(self, deployment_scenario):
+    def get_deployment_scenario_simulation_configs(self, area, deployment_scenario):
         if not isinstance(deployment_scenario, DeploymentScenario):
             deployment_scenario = self.deployment_scenarios[deployment_scenario]
 
@@ -619,14 +621,15 @@ class PipelineConfig:
             demand_identification_parameter_values = dict(**demand_impacting_parameters_values)
             for key in self.service_parameters_config.non_demand_impacting_params.keys():
                 demand_identification_parameter_values[key] = parameters_dict[key][0]
-            demand_identification_simulation_config = SimulationConfig(deployment_scenario,
+            demand_identification_simulation_config = SimulationConfig(area,
+                                                                       deployment_scenario,
                                                                        self.service_parameters_config,
                                                                        demand_identification_parameter_values)
             for non_demand_impacting_parameters_values in dctproduct(({key: parameters_dict[key] for key in
                                                                        self.service_parameters_config.non_demand_impacting_params.keys()})):
                 parameter_values = dict(**demand_impacting_parameters_values)
                 parameter_values.update(non_demand_impacting_parameters_values)
-                simulation_config = SimulationConfig(deployment_scenario, self.service_parameters_config,
+                simulation_config = SimulationConfig(area, deployment_scenario, self.service_parameters_config,
                                                      parameter_values)
                 assert simulation_config.hash_code not in simulation_configs
                 simulation_config.demand_source = demand_identification_simulation_config.hash_code
@@ -730,8 +733,9 @@ class PipelineConfig:
 
 
 class SimulationConfig:
-    def __init__(self, deployment_scenario: DeploymentScenario, service_parameters_config: ServiceParametersConfig,
-                 service_parameters_values: dict):
+    def __init__(self, area: str, deployment_scenario: DeploymentScenario,
+                 service_parameters_config: ServiceParametersConfig, service_parameters_values: dict):
+        self.area = area
         self.deployment_scenario = deployment_scenario
         self.services_parameters_config = service_parameters_config
         self.services_parameters_values = service_parameters_values
@@ -752,6 +756,7 @@ class SimulationConfig:
         assert "deployment_scenario" not in d
         assert "fleet_size" not in d
         d["deployment_scenario"] = self.deployment_scenario.name
+        d["area"] = self.area
         return d
 
     @staticmethod
@@ -771,6 +776,7 @@ class SimulationConfig:
     @staticmethod
     def demand_impacting_hash(simulation_config):
         d = {key: value for key, value in simulation_config.get_dict().items()
-             if key in simulation_config.services_parameters_config.demand_impacting_params}
+             if key in list(simulation_config.services_parameters_config.demand_impacting_params.keys()) + [
+                 "deployment_scenario", "area"]}
         l = SimulationConfig.dict_to_deterministic_list(d)
         return str(hashlib.sha256(str(l).encode("utf-8")).hexdigest())

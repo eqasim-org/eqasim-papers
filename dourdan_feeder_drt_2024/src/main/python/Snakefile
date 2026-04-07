@@ -548,6 +548,6 @@ rule simulation_summary:
 rule all:
     default_target: True
     input:
-        expand(["%s/simulations/evaluation/{area_id}/%s/%s/{file}" % (config_object.output_path, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
+        expand(["%s/simulations/evaluation/%s/%s/%s/{file}" % (config_object.output_path, simulation_config.area, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
             area_id=list(config_object.area_configs.keys()),
             file=["results.zip", "summary.yaml"]),
