@@ -551,3 +551,21 @@ rule all:
         expand(["%s/simulations/evaluation/%s/%s/%s/{file}" % (config_object.output_path, simulation_config.area, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
             area_id=list(config_object.area_configs.keys()),
             file=["results.zip", "summary.yaml"]),
+
+rule print_configs:
+    output:
+        "%s/simulation_configs.json" % config_object.output_path
+    run:
+        import json
+        from lib import SimulationConfig
+        configs = []
+        for simulation_config in config_object.simulation_configs.values():
+            d = dict(**simulation_config.get_dict())
+            d["demand_source"] = simulation_config.demand_source
+            d["hash_code"] = simulation_config.hash_code
+            configs.append(d)
+        configs.sort(key=lambda e: e["hash_code"])
+        configs_lists = [SimulationConfig.dict_to_deterministic_list(d) for d in configs]
+        print(configs[-1])
+        with open(output[0], "w") as f:
+            json.dump(configs_lists, f, indent=4)

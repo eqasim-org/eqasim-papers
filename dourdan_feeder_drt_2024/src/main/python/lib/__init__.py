@@ -172,12 +172,19 @@ class ServiceParametersConfig:
                     in dctproduct(non_stochastic_parameters_dict)]
 
         lhs_params = dict()
+        uniform_params = dict()
         for param in list(self.demand_impacting_params.values()) + list(self.non_demand_impacting_params.values()):
             if param.lhs is not None:
                 lhs_params[param.name] = param
+            if param.randomness == "uniform":
+                uniform_params[param.name] = param
 
         sorted_lhs_params = list(lhs_params.keys())
         sorted_lhs_params.sort()
+
+        sorted_uniform_params = list(uniform_params.keys())
+        sorted_uniform_params.sort()
+
         configs = []
 
         generator = nprand.default_rng(seed=seed)
@@ -219,10 +226,9 @@ class ServiceParametersConfig:
                         parameter_values[param.name] = value
 
                 # Then we sample independent params
-                for param in list(self.demand_impacting_params.values()) + list(
-                        self.non_demand_impacting_params.values()):
-                    if param.randomness == "uniform":
-                        parameter_values[param.name] = generator.choice(param.values)
+                for key in sorted_uniform_params:
+                    param = uniform_params[key]
+                    parameter_values[param.name] = param.values[generator.choice(len(param.values))]
                 config = SimulationConfig(area, deployment_scenario, self, parameter_values)
                 # We make sure that there is no redundancy
                 if config.hash_code not in current_hashes:
@@ -349,8 +355,9 @@ def dctproduct(dct):
     >>> list(dctproduct({'number': [1, 2], 'character': 'ab'}))
     [{'number': 1, 'character': 'a'}, {'number': 1, 'character': 'b'}, {'number': 2, 'character': 'a'}, {'number': 2, 'character': 'b'}]
     """
-    keys = dct.keys()
-    for vals in itertools.product(*dct.values()):
+    keys = list(dct.keys())
+    keys.sort()
+    for vals in itertools.product(*[dct[key] for key in keys]):
         yield dict(zip(keys, vals))
 
 
