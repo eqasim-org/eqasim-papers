@@ -404,6 +404,7 @@ class PipelineConfig:
         for f in self.drop_simulation_outputs:
             if f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS or f == "drt_customer_stats_drt.csv":
                 raise Exception("simulation output file `%s` cannot be dropped" % f)
+        self.drop_simulation_outputs.sort()
 
         self.samples_per_deterministic_combination = int(config_dict["samples_per_deterministic_combination"]) \
             if "samples_per_deterministic_combination" in config_dict else None
