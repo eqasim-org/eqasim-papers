@@ -384,9 +384,11 @@ rule demand_identification_simulation:
         runtime=config_object.demand_identification_simulation_resources.runtime
     params:
         output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash),
-        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True)
+        args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True),
+        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
     benchmark: "%s/benchmarks/demand_identification/{area_id}/{group}/{hash}.txt" % config_object.output_path
-    shell:
+    run:
+        shell(
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
         org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
@@ -395,8 +397,10 @@ rule demand_identification_simulation:
         --config:controller.outputDirectory {params.output_dir} \
         --config:eqasim.costParametersPath {input.cost_params} {params.args} \
         --config:transit.transitScheduleFile {input.transit_schedule}
-        """
-
+        """)
+        import json
+        with open(os.path.join(params.output_dir, "summary.json"), "w") as f:
+            json.dump(params.summary, f)
 
 rule fleet_sizing_simulation:
     input:
@@ -406,13 +410,15 @@ rule fleet_sizing_simulation:
     params:
         output_dir = lambda wildcards: "%s/simulations/fleet_sizing/%s/%s/%s/%s/seeds/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash, wildcards.fleet_size, wildcards.seed),
         args = lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=False),
-        to_remove = " ".join(config_object.drop_simulation_outputs)
+        to_remove = " ".join(config_object.drop_simulation_outputs),
+        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
     threads: config_object.single_iteration_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.single_iteration_simulation_resources.memory) + 10240,
         runtime=config_object.single_iteration_simulation_resources.runtime
     benchmark: "%s/benchmarks/fleet_sizing/{area_id}/{group}/{hash}/{fleet_size}/{seed}.txt" % config_object.output_path
-    shell:
+    run:
+        shell(
         """
         {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
         org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
@@ -422,10 +428,19 @@ rule fleet_sizing_simulation:
         --config:eqasim.costParametersPath {input.cost_params} {params.args} \
         --config:dvrp.initialTravelTimesFile {input.dvrp_travel_times} \
         --config:transit.transitScheduleFile {input.transit_schedule}
+        """
+        )
+        params.summary["fleet_size"] = int(wildcards.fleet_size)
+        params.summary["seed"] = wildcards.seed
+        with open(os.path.join(params.output_dir, "summary.json"), "w") as f:
+            json.dump(params.summary, f)
+        shell(
+        """
         cd {params.output_dir}
         rm -rf {params.to_remove}
         zip -r -m -T ../{wildcards.seed}.zip *
         """
+        )
 
 
 def get_rejection_rate(sim_path):
@@ -521,36 +536,12 @@ rule fleet_sizing:
         with zipfile.ZipFile(output[0], "a") as zip:
             zip.writestr("fleet_size.txt", params.fleet_size)
 
-
-rule simulation_summary:
-    input:
-        "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip" % config_object.output_path
-    output:
-        "%s/simulations/evaluation/{area_id}/{group}/{hash}/summary.yaml" % config_object.output_path
-    params:
-        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
-    threads: 1
-    resources:
-        mem_mb=1024,
-        runtime=5
-    run:
-        import yaml
-        import os
-        import zipfile
-        with zipfile.ZipFile(input[0]) as zip:
-            with zip.open("fleet_size.txt") as f:
-                fleet_size = int(f.read())
-        params.summary["fleet_size"] = fleet_size
-        with open(output[0], "w") as f:
-            yaml.dump(params.summary,  f, default_flow_style=False)
-
-
 rule all:
     default_target: True
     input:
         expand(["%s/simulations/evaluation/%s/%s/%s/{file}" % (config_object.output_path, simulation_config.area, simulation_config.deployment_scenario.name, simulation_config.hash_code) for simulation_config in config_object.simulation_configs.values()],
             area_id=list(config_object.area_configs.keys()),
-            file=["results.zip", "summary.yaml"]),
+            file=["results.zip"]),
 
 rule print_configs:
     output:
