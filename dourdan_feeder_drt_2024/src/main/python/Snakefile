@@ -430,6 +430,7 @@ rule fleet_sizing_simulation:
         --config:transit.transitScheduleFile {input.transit_schedule}
         """
         )
+        import json
         params.summary["fleet_size"] = int(wildcards.fleet_size)
         params.summary["seed"] = wildcards.seed
         with open(os.path.join(params.output_dir, "summary.json"), "w") as f:
