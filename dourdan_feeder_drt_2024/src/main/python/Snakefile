@@ -525,7 +525,8 @@ rule fleet_sizing:
         mem_mb=2048,
         runtime=60
     params:
-        fleet_size=lambda wildcards, input: str(input[0].split("/")[-2])
+        fleet_size=lambda wildcards, input: str(input[0].split("/")[-2]),
+        demand_source=lambda wildcards: config_object.hash_to_config(wildcards.hash).demand_source
     output:
         "%s/simulations/evaluation/{area_id}/{group}/{hash}/results.zip" % config_object.output_path
     run:
@@ -536,6 +537,7 @@ rule fleet_sizing:
         check = int(params.fleet_size)
         with zipfile.ZipFile(output[0], "a") as zip:
             zip.writestr("fleet_size.txt", params.fleet_size)
+            zip.writestr("demand_source.txt", params.demand_source)
 
 rule all:
     default_target: True
