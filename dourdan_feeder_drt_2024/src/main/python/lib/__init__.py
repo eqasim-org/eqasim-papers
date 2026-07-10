@@ -370,6 +370,10 @@ class PipelineConfig:
         self.temp_path = to_absolute(config_dict["temp_path"], basedir)
         self.random_seed = int(config_dict["random_seed"])
 
+        self.demand_identification_method = config_dict.get("demand_identification_method", "iterative_simulation")
+
+        assert self.demand_identification_method in ["iterative_simulation", "standalone_mode_choice"]
+
         self.java = JavaConfig(config_dict["java"])
 
         self.global_simulation_resources = ResourcesConfig(config_dict["resources"]["global_simulations"], max_cores)
@@ -466,6 +470,12 @@ class PipelineConfig:
 
     def area_baseline_simulation_output_file_path(self, area_id, file_name):
         return os.path.join(self.area_baseline_simulation_outputs_location(area_id), file_name)
+
+    def area_baseline_simulation_output_file_names(self):
+        file_names = list(PipelineConfig.RELEVANT_SIMULATION_OUTPUTS)
+        if self.demand_identification_method != "iterative_simulation":
+            file_names.append("vdf_travel_times.bin")
+        return file_names
 
     def area_vehicles_files_location(self, area_id):
         return self.area_simulation_input_file_path(area_id, "drt_vehicles")
@@ -701,6 +711,8 @@ class PipelineConfig:
             else:
                 inputs["plans"] = self.area_baseline_simulation_output_file_path(area_id, "output_plans.xml.gz")
 
+        if demand_identification and self.demand_identification_method == "standalone_mode_choice":
+            inputs["travel_times"] = self.area_baseline_simulation_output_file_path(area_id, "vdf_travel_times.bin")
         inputs.update(kwargs)
         return inputs
 

@@ -157,3 +157,4 @@ fleet_sizing:
 output_path: "output_1pct"
 temp_path: "temp_1pct"
 random_seed: 1234
+demand_identification_method: "standalone_mode_choice"

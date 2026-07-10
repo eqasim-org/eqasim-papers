@@ -201,13 +201,14 @@ rule area_simulation_baseline:
         jar_path,
         lambda wildcards: config_object.area_baseline_config_path(config_object.get_area_by_prefix(wildcards.area_prefix).id)
     output:
-        ["%s/simulations/{area_prefix}baseline/%s" % (config_object.output_path, f) for f in PipelineConfig.RELEVANT_SIMULATION_OUTPUTS]
+        ["%s/simulations/{area_prefix}baseline/%s" % (config_object.output_path, f) for f in config_object.area_baseline_simulation_output_file_names()]
     threads: config_object.area_baseline_simulation_resources.threads
     resources:
         mem_mb=memory_string_to_mb(config_object.area_baseline_simulation_resources.memory) + 10240,
         runtime=config_object.area_baseline_simulation_resources.runtime
     params:
-        output_dir=lambda wildcards: "%s/simulations/%sbaseline" % (config_object.output_path, wildcards.area_prefix)
+        output_dir=lambda wildcards: "%s/simulations/%sbaseline" % (config_object.output_path, wildcards.area_prefix),
+        vdf_write_interval=0 if config_object.demand_identification_method == "iterative_simulation" else 100
     benchmark: "%s/benchmarks/area_baseline/{area_prefix}.txt" % config_object.output_path
     shell:
         '''
@@ -215,7 +216,8 @@ rule area_simulation_baseline:
         --config-path {input[1]} \
         --config:global.numberOfThreads {config_object.area_baseline_simulation_resources.threads} \
         --config:controller.outputDirectory {params.output_dir} \
-        --config:controller.lastIteration 100
+        --config:controller.lastIteration 100 \
+        --config:eqasim:vdf.writeTravelTimesInterval {params.vdf_write_interval}
         '''
 
 rule drt_vehicles:
@@ -385,19 +387,40 @@ rule demand_identification_simulation:
     params:
         output_dir=lambda wildcards: "%s/simulations/demand_identification/%s/%s/%s" % (config_object.output_path, wildcards.area_id, wildcards.group, wildcards.hash),
         args=lambda wildcards: config_object.get_simulation_args(wildcards.hash, demand_identification=True),
-        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict()
+        summary=lambda wildcards: config_object.hash_to_config(wildcards.hash).get_dict(),
+        method=config_object.demand_identification_method
     benchmark: "%s/benchmarks/demand_identification/{area_id}/{group}/{hash}.txt" % config_object.output_path
     run:
-        shell(
-        """
-        {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
-        org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
-        --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
-        --config:plans.inputPlansFile {input.plans} \
-        --config:controller.outputDirectory {params.output_dir} \
-        --config:eqasim.costParametersPath {input.cost_params} {params.args} \
-        --config:transit.transitScheduleFile {input.transit_schedule}
-        """)
+        if params.method == "iterative_simulations":
+            shell(
+            """
+            {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
+            org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation --config-path {input.config} \
+            --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
+            --config:plans.inputPlansFile {input.plans} \
+            --config:controller.outputDirectory {params.output_dir} \
+            --config:eqasim.costParametersPath {input.cost_params} {params.args} \
+            --config:transit.transitScheduleFile {input.transit_schedule}
+            """)
+        else:
+            shell(
+            """
+            {java_cmd} XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
+            org.eqasim.core.standalone_mode_choice.RunStandaloneModeChoice --config-path {input.config} \
+            --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
+            --config:plans.inputPlansFile {input.plans} \
+            --config:controller.outputDirectory {params.output_dir} \
+            --config:eqasim.costParametersPath {input.cost_params} {params.args} \
+            --config:transit.transitScheduleFile {input.transit_schedule} \
+            --simulate-after org.eqasim.papers.dourdan_feeder_drt_2024.RunSimulation
+            
+            cd "{params.output_dir}"
+            mkdir old
+            mv * old/ || echo ""
+            mv old/sim/* ./
+            rm -rf old
+            """
+            )
         import json
         with open(os.path.join(params.output_dir, "summary.json"), "w") as f:
             json.dump(params.summary, f)
