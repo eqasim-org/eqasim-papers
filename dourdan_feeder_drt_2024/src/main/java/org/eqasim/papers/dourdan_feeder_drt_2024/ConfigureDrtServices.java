@@ -66,10 +66,6 @@ public class ConfigureDrtServices {
         AdaptConfigForDrt.adapt(config, Map.of("drt", "drt_vehicles.xml"), Map.of("drt", "door2door"), new HashMap<>(), Map.of("drt", ModeChoiceModule.FEEDER_DRT_COST_MODEL), new HashMap<>(), "30:00:00", unimodalAvailability.isPresent());
 
 
-        if(OFF_PEAK_AVAIlABILITY.equals(unimodalAvailability.orElse("null"))) {
-            addOffPeakLegTimeConstraint(config, "drt");
-        }
-
         if(intermodalAvailability.isPresent()) {
             AdaptConfigForFeederDrt.adapt(config, Map.of("feeder_drt", "pt"), Map.of("feeder_drt", "drt"), new HashMap<>(),
                     Map.of("feeder_drt", intermodalTransferLocationModes.orElse("")),
@@ -85,6 +81,12 @@ public class ConfigureDrtServices {
             if(OFF_PEAK_AVAIlABILITY.equals(intermodalAvailability.get())) {
                 addOffPeakLegTimeConstraint(config, "feeder_drt");
             }
+        }
+
+        // We have to add the leg time constraints for DRT at the end because they would otherwise be detected by
+        // AdaptConfigForFeederDrt
+        if(OFF_PEAK_AVAIlABILITY.equals(unimodalAvailability.orElse("null"))) {
+            addOffPeakLegTimeConstraint(config, "drt");
         }
 
         for(DrtConfigGroup drtConfigGroup: MultiModeDrtConfigGroup.get(config).getModalElements()) {
