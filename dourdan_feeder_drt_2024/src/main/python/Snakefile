@@ -93,17 +93,18 @@ rule baseline_config:
         --input-config-path="{input[1]}" --output-config-path="{output[0]}"
         {java_cmd} -cp "{input[0]}" org.eqasim.core.simulation.vdf.utils.AdaptConfigForVDF \
         --input-config-path="{output[0]}" \
-        --output-config-path="{output[0]}" --engine=true \
-        --config:eqasim:vdf_engine.generateNetworkEvents=true \
+        --output-config-path="{output[0]}" --use-engine=true \
+        --config:eqasim:vdf_engine.generateNetworkEventsInterval=1 \
+        --config:controller.compressionType=gzip \
         --config:eqasim:vdf.writeTravelTimesInterval=1 --config:controller.lastIteration=0 \
         --config:swissRailRaptor.transferCalculation=Adaptive \
-        --config:eqasim:vdf.handler Horizon
+        --config:eqasim:vdf.handler=Horizon
         """
 
-baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv")
+baseline_trips_path = config_object.global_simulation_output_file_path("eqasim_trips.csv.gz")
 baseline_plans_path = config_object.global_simulation_output_file_path("output_plans.xml.gz")
 baseline_events_path = config_object.global_simulation_output_file_path("output_events.xml.gz")
-baseline_travel_times_path = config_object.global_simulation_output_file_path("vdf_travel_times.bin")
+baseline_travel_times_path = config_object.global_simulation_output_file_path("vdf_travel_times.bin.gz")
 
 def global_simulation_baseline_input(wildcards):
     if config_object.general_inputs_config.baseline_outputs is None:
@@ -112,7 +113,7 @@ def global_simulation_baseline_input(wildcards):
         return ["%s/%s" % (config_object.general_inputs_config.baseline_outputs, f) for f in ["eqasim_trips.csv",
                                                                                               "output_plans.xml.gz",
                                                                                               "output_events.xml.gz",
-                                                                                              "vdf_travel_times.bin"]]
+                                                                                              "vdf_travel_times.bin.gz"]]
 
 
 rule global_simulation_baseline:
@@ -277,8 +278,8 @@ rule network_gpkg:
 rule modified_transit_schedule_lines:
     input:
         schedule_gpkg="%s/misc/{area_prefix}network.gpkg" % config_object.output_path,
-        legs="%s/simulations/{area_prefix}baseline/eqasim_legs.csv" % config_object.output_path,
-        pt_legs="%s/simulations/{area_prefix}baseline/eqasim_pt.csv" % config_object.output_path,
+        legs="%s/simulations/{area_prefix}baseline/eqasim_legs.csv.gz" % config_object.output_path,
+        pt_legs="%s/simulations/{area_prefix}baseline/eqasim_pt.csv.gz" % config_object.output_path,
         area=lambda wildcards: config_object.get_area_by_prefix(wildcards.area_prefix).path
     params:
         lambda wildcards: config_object.get_modified_transit_schedule_params(wildcards.schedule)
@@ -391,7 +392,7 @@ rule demand_identification_simulation:
         method=config_object.demand_identification_method
     benchmark: "%s/benchmarks/demand_identification/{area_id}/{group}/{hash}.txt" % config_object.output_path
     run:
-        if params.method == "iterative_simulations":
+        if params.method == "iterative_simulation":
             shell(
             """
             {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
@@ -405,8 +406,9 @@ rule demand_identification_simulation:
         else:
             shell(
             """
-            {java_cmd} XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
+            {java_cmd} -XX:MaxRAMPercentage=100.0 -Xmx{config_object.area_baseline_simulation_resources.memory} -cp {input.jar_path} \
             org.eqasim.core.standalone_mode_choice.RunStandaloneModeChoice --config-path {input.config} \
+            --eqasim-configurator org.eqasim.papers.dourdan_feeder_drt_2024.ModeChoiceConfigurator \
             --config:multiModeDrt.drt[mode=drt].vehiclesFile {input.vehicles} \
             --config:plans.inputPlansFile {input.plans} \
             --config:standaloneModeChoice.outputDirectory {params.output_dir} \
