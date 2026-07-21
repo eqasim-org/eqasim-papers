@@ -362,7 +362,7 @@ def dctproduct(dct):
 
 
 class PipelineConfig:
-    RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv", "eqasim_legs.csv", "eqasim_pt.csv", "output_events.xml.gz",
+    RELEVANT_SIMULATION_OUTPUTS = ["eqasim_trips.csv.gz", "eqasim_legs.csv.gz", "eqasim_pt.csv.gz", "output_events.xml.gz",
                                    "output_plans.xml.gz"]
 
     def __init__(self, config_dict, basedir, max_cores):
@@ -474,7 +474,7 @@ class PipelineConfig:
     def area_baseline_simulation_output_file_names(self):
         file_names = list(PipelineConfig.RELEVANT_SIMULATION_OUTPUTS)
         if self.demand_identification_method != "iterative_simulation":
-            file_names.append("vdf_travel_times.bin")
+            file_names.append("vdf_travel_times.bin.gz")
         return file_names
 
     def area_vehicles_files_location(self, area_id):
@@ -712,7 +712,7 @@ class PipelineConfig:
                 inputs["plans"] = self.area_baseline_simulation_output_file_path(area_id, "output_plans.xml.gz")
 
         if demand_identification and self.demand_identification_method == "standalone_mode_choice":
-            inputs["travel_times"] = self.area_baseline_simulation_output_file_path(area_id, "vdf_travel_times.bin")
+            inputs["travel_times"] = self.area_baseline_simulation_output_file_path(area_id, "vdf_travel_times.bin.gz")
         inputs.update(kwargs)
         return inputs
 
