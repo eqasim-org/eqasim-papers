@@ -6,6 +6,9 @@ import org.eqasim.ile_de_france.IDFConfigurator;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaConfigGroup;
 import org.eqasim.papers.dourdan_feeder_drt_2024.analysis.cba.cba.CbaModule;
 import org.eqasim.papers.dourdan_feeder_drt_2024.prebooking.CustomPrebookingLogic;
+import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.drt.run.MultiModeDrtConfigGroup;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.controler.AbstractModule;
@@ -32,12 +35,12 @@ public class Configurator extends IDFConfigurator {
             @Override
             public void install() {
                 MultiModeDrtConfigGroup configGroup = MultiModeDrtConfigGroup.get(getConfig());
-                if(configGroup.getModalElements().size() != 1) {
+                if (configGroup.getModalElements().size() != 1) {
                     throw new IllegalStateException();
                 }
 
                 configGroup.getModalElements().forEach(element -> {
-                    if(!element.getMode().equals("drt")) {
+                    if (!element.getMode().equals("drt")) {
                         throw new IllegalStateException();
                     }
 
@@ -53,12 +56,13 @@ public class Configurator extends IDFConfigurator {
                 addControllerListenerBinding().toProvider(new Provider<>() {
                     @Inject
                     OutputDirectoryHierarchy outputDirectoryHierarchy;
+
                     @Override
                     public ControllerListener get() {
                         return (ShutdownListener) shutdownEvent -> {
                             String filePath = outputDirectoryHierarchy.getIterationFilename(shutdownEvent.getIteration(), "dvrp_travel_times.csv.gz");
                             File file = new File(filePath);
-                            if(Files.exists(file.toPath())) {
+                            if (Files.exists(file.toPath())) {
                                 try {
                                     Files.copy(file.toPath(), new File(outputDirectoryHierarchy.getOutputFilename("dvrp_travel_times.csv.gz")).toPath());
                                 } catch (IOException e) {
@@ -70,5 +74,16 @@ public class Configurator extends IDFConfigurator {
                 }).asEagerSingleton();
             }
         }, MultiModeDrtConfigGroup.GROUP_NAME);
+    }
+
+    public void adjustScenario(Scenario scenario) {
+        super.adjustScenario(scenario);
+        for (Person person : scenario.getPopulation().getPersons().values()) {
+            if (person.getSelectedPlan().getPlanElements().getLast() instanceof Activity activity &&
+                    activity.getEndTime().isUndefined()) {
+                activity.setEndTime(Double.POSITIVE_INFINITY);
+
+            }
+        }
     }
 }
