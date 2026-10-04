@@ -79,10 +79,11 @@ public class Configurator extends IDFConfigurator {
     public void adjustScenario(Scenario scenario) {
         super.adjustScenario(scenario);
         for (Person person : scenario.getPopulation().getPersons().values()) {
+            // Prebooking Queue doesn't like undefined end times
+            // So we set + infinity for last activities
             if (person.getSelectedPlan().getPlanElements().getLast() instanceof Activity activity &&
                     activity.getEndTime().isUndefined()) {
                 activity.setEndTime(Double.POSITIVE_INFINITY);
-
             }
         }
     }
