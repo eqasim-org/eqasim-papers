@@ -47,16 +47,22 @@ public class CustomPrebookingLogic implements org.matsim.contrib.drt.prebooking.
 
             for (TripStructureUtils.Trip trip : TripStructureUtils.getTrips(personItem.plan())) {
                 timeTracker.addActivity(trip.getOriginActivity());
+                boolean ignoreCurrentTrip = false;
 
                 for (PlanElement element : trip.getTripElements()) {
                     if (element instanceof Leg) {
                         Leg leg = (Leg) element;
-
-                        if(!this.prebookingHorizonPerRoutingMode.containsKey(leg.getRoutingMode())) {
-                            break;
+                        // In some cases, the departure time of the leg is greater than the end time of the previous activity
+                        // This can happen for instance in the DMC if the previous trip arrives later than the end time of the activity
+                        if(leg.getDepartureTime().orElse(timeTracker.getTime().seconds()) > timeTracker.getTime().seconds()){
+                            timeTracker.setTime(leg.getDepartureTime().seconds());
                         }
 
-                        if (mode.equals(leg.getMode())) {
+                        if(!this.prebookingHorizonPerRoutingMode.containsKey(leg.getRoutingMode())) {
+                            ignoreCurrentTrip = true;
+                        }
+
+                        if (!ignoreCurrentTrip && mode.equals(leg.getMode())) {
 
                             Float prebookingHorizon = prebookingHorizonPerRoutingMode.get(leg.getRoutingMode());
                             if (prebookingHorizon == null) {
