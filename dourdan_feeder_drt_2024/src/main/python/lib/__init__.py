@@ -371,6 +371,7 @@ class PipelineConfig:
         self.random_seed = int(config_dict["random_seed"])
 
         self.demand_identification_method = config_dict.get("demand_identification_method", "iterative_simulation")
+        self.demand_identification_only = config_dict.get("demand_identification_only", False)
 
         assert self.demand_identification_method in ["iterative_simulation", "standalone_mode_choice"]
 
